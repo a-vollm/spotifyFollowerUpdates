@@ -4,19 +4,14 @@ const S = 'https://api.spotify.com/v1'
 let cacheStatus = { loading: false, totalArtists: 0, doneArtists: 0 }
 let cachedByYear = {}
 let cachedLatest = []
+
 async function rebuild() {
-    try {
-        await ensureAccess()
-    } catch {
-        return
-    }
+    try { await ensureAccess() } catch { return }
     cacheStatus = { loading: true, totalArtists: 0, doneArtists: 0 }
     let ids = []
     let next = `${S}/me/following?type=artist&limit=50`
     while (next) {
-        const r = await axios.get(next, {
-            headers: { Authorization: 'Bearer ' + getAccessToken() }
-        })
+        const r = await axios.get(next, { headers: { Authorization: 'Bearer ' + getAccessToken() } })
         ids.push(...r.data.artists.items.map(a => a.id))
         next = r.data.artists.next
     }
@@ -52,13 +47,9 @@ async function rebuild() {
         .slice(0, 20)
     cacheStatus.loading = false
 }
-function getCacheStatus() {
-    return cacheStatus
-}
-function getReleases(year) {
-    return cachedByYear[year] || []
-}
-function getLatest() {
-    return cachedLatest
-}
+
+function getCacheStatus() { return cacheStatus }
+function getReleases(year) { return cachedByYear[year] || [] }
+function getLatest() { return cachedLatest }
+
 module.exports = { rebuild, getCacheStatus, getReleases, getLatest }

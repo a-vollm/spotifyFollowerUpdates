@@ -8,6 +8,7 @@ const REDIRECT_URI = process.env.REDIRECT_URI
 let accessToken = ''
 let refreshToken = ''
 let expiresAt = 0
+
 function ensureAccess() {
     if (!refreshToken) throw new Error('not authorized')
     if (Date.now() >= expiresAt) {
@@ -20,8 +21,7 @@ function ensureAccess() {
             {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    Authorization:
-                        'Basic ' +
+                    Authorization: 'Basic ' +
                         Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64')
                 }
             }
@@ -32,16 +32,17 @@ function ensureAccess() {
     }
     return Promise.resolve()
 }
-router.get('/login', (req, res) => {
-    const scope = 'user-follow-read'
+
+router.get('/auth', (req, res) => {
     const params = new URLSearchParams({
         client_id: CLIENT_ID,
         response_type: 'code',
         redirect_uri: REDIRECT_URI,
-        scope
+        scope: 'user-read-private user-read-email'
     })
     res.redirect('https://accounts.spotify.com/authorize?' + params.toString())
 })
+
 router.get('/callback', (req, res) => {
     const code = req.query.code
     axios
@@ -55,8 +56,7 @@ router.get('/callback', (req, res) => {
             {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    Authorization:
-                        'Basic ' +
+                    Authorization: 'Basic ' +
                         Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64')
                 }
             }
@@ -65,8 +65,9 @@ router.get('/callback', (req, res) => {
             accessToken = r.data.access_token
             refreshToken = r.data.refresh_token
             expiresAt = Date.now() + r.data.expires_in * 1000
-            res.sendStatus(200)
+            res.redirect(`${REDIRECT_URI}?access_token=${accessToken}&refresh_token=${refreshToken}`)
         })
         .catch(() => res.sendStatus(400))
 })
+
 module.exports = { router, ensureAccess, getAccessToken: () => accessToken }
