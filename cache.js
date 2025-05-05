@@ -91,14 +91,9 @@ async function rebuild() {
  * @returns {{loading: boolean, totalArtists: number, doneArtists: number}}
  */
 function getCacheStatus() {
-    const token = localStorage.getItem('spotify_token');
-
-    return this.http.get(`${this.api}/cache-status`, {
-        headers: {
-            Authorization: `Bearer ${token}` // Token im Header senden
-        }
-    });
+    return cacheStatus;
 }
+
 /**
  * Get releases grouped by month for a given year.
  * @param {string|number} year
