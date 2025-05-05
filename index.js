@@ -9,10 +9,20 @@ const socket = require('./socket')
 const cache = require('./cache')
 
 const app = express()
-app.use(cors({
-    origin: process.env.FRONTEND_URL, 
+// Erweitere die CORS-Konfiguration
+const corsOptions = {
+    origin: [
+        'http://localhost:4200', // Angular Dev-Server
+        'https://your-production-domain.com' // Produktions-URL
+    ],
+    methods: 'GET,POST,OPTIONS',
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
-}));
+};
+
+app.use(cors(corsOptions));
+
+app.options('*', cors(corsOptions));
 app.use(express.json())
 app.use(authRouter)    // OAuth start and callback
 app.use(dataRouter)    // cache-status, releases, latest
