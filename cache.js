@@ -6,7 +6,8 @@ let cachedByYear = {}
 let cachedLatest = []
 
 async function rebuild() {
-    try { await ensureAccess() } catch { return }
+    await ensureAccess().catch(() => {
+    })
     cacheStatus = { loading: true, totalArtists: 0, doneArtists: 0 }
     let ids = []
     let next = `${S}/me/following?type=artist&limit=50`
@@ -16,7 +17,7 @@ async function rebuild() {
         next = r.data.artists.next
     }
     cacheStatus.totalArtists = ids.length
-    let all = []
+    const all = []
     for (const id of ids) {
         try {
             const r = await axios.get(`${S}/artists/${id}/albums`, {
@@ -27,29 +28,28 @@ async function rebuild() {
         } catch {}
         cacheStatus.doneArtists++
     }
-    let byYearTemp = {}
+    // group by year/month…
+    const byYear = {}
     all.forEach(r => {
-        const d = new Date(r.release_date)
-        const y = d.getFullYear()
-        if (!byYearTemp[y]) byYearTemp[y] = {}
-        const m = d.toLocaleString('default', { month: 'long' })
-        if (!byYearTemp[y][m]) byYearTemp[y][m] = []
-        byYearTemp[y][m].push(r)
+        const y = new Date(r.release_date).getFullYear()
+        const m = new Date(r.release_date).toLocaleString('default', {month: 'long'})
+        byYear[y] = byYear[y] || {}
+        byYear[y][m] = (byYear[y][m] || []).concat(r)
     })
-    cachedByYear = {}
-    Object.keys(byYearTemp).forEach(y => {
-        cachedByYear[y] = Object.entries(byYearTemp[y])
+    cachedByYear = Object.fromEntries(Object.entries(byYear).map(([y, months]) => {
+        return [y, Object.entries(months)
             .sort(([a], [b]) => new Date(`${b} 1,${y}`) - new Date(`${a} 1,${y}`))
-            .map(([month, releases]) => ({ month, releases }))
-    })
-    cachedLatest = all
-        .sort((a, b) => new Date(b.release_date) - new Date(a.release_date))
-        .slice(0, 20)
+            .map(([month, releases]) => ({month, releases}))]
+    }))
+    cachedLatest = all.sort((a, b) => new Date(b.release_date) - new Date(a.release_date)).slice(0, 20)
     cacheStatus.loading = false
 }
 
 function getCacheStatus() { return cacheStatus }
-function getReleases(year) { return cachedByYear[year] || [] }
+
+function getReleases(year) {
+    return cachedByYear[year] || []
+}
 function getLatest() { return cachedLatest }
 
 module.exports = { rebuild, getCacheStatus, getReleases, getLatest }

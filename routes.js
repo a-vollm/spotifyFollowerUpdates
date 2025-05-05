@@ -1,6 +1,6 @@
 const express = require('express')
 const {getCacheStatus, getReleases, getLatest} = require('./cache')
-const {ensureAccess, getAccessToken} = require('./auth')
+const {ensureAccess} = require('./auth')
 const router = express.Router()
 
 const ensureAuth = (req, res, next) => {
@@ -12,14 +12,8 @@ const ensureAuth = (req, res, next) => {
     }
 }
 
-router.get('/cache-status', ensureAuth, (req, res) =>
-    res.json(getCacheStatus())
-)
-router.get('/releases/:year', ensureAuth, (req, res) =>
-    res.json(getReleases(req.params.year))
-)
-router.get('/latest', ensureAuth, (req, res) =>
-    res.json(getLatest())
-)
+router.get('/cache-status', ensureAuth, (req, res) => res.json(getCacheStatus()))
+router.get('/releases/:year', ensureAuth, (req, res) => res.json(getReleases(req.params.year)))
+router.get('/latest', ensureAuth, (req, res) => res.json(getLatest()))
 
 module.exports = router
