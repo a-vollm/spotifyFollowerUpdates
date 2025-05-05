@@ -3,6 +3,7 @@ const express = require('express');
 const axios = require('axios');
 const querystring = require('querystring');
 const router = express.Router();
+
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI;
@@ -52,7 +53,11 @@ router.get('/auth/spotify/callback', async (req, res) => {
         code,
         redirect_uri: REDIRECT_URI
     });
-    const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+    const authHeader = Buffer
+        .from(`${CLIENT_ID}:${CLIENT_SECRET}`)
+        .toString('base64');
+
+    // 1) Code → Tokens
     const { data } = await axios.post(
         'https://accounts.spotify.com/api/token',
         body,
@@ -68,9 +73,11 @@ router.get('/auth/spotify/callback', async (req, res) => {
     refreshToken = data.refresh_token;
     expiresAt = Date.now() + data.expires_in * 1000;
 
+    // 2) Cache neu aufbauen
     const cache = require('./cache');
     await cache.rebuild();
 
+    // 3) Socket‑Event senden
     try {
         const io = require('./socket').get();
         io.emit('cacheUpdated');
@@ -78,7 +85,49 @@ router.get('/auth/spotify/callback', async (req, res) => {
         console.warn('Socket.IO nicht initialisiert', e);
     }
 
-    res.redirect(`${FRONTEND_URI}/callback?access_token=${accessToken}&refresh_token=${refreshToken}`);
+    // 4) Weiterleitung ans Frontend mit beiden Tokens
+    res.redirect(
+        `${FRONTEND_URI}/callback?access_token=${accessToken}&refresh_token=${refreshToken}`
+    );
+});
+
+// NEU: Endpoint für Client, um Access‑Token via Refresh‑Token zu erneuern
+router.get('/refresh', async (req, res) => {
+    const token = req.query.refresh_token;
+    if (!token) {
+        return res.status(400).json({error: 'Missing refresh_token'});
+    }
+
+    const body = querystring.stringify({
+        grant_type: 'refresh_token',
+        refresh_token: token
+    });
+    const authHeader = Buffer
+        .from(`${CLIENT_ID}:${CLIENT_SECRET}`)
+        .toString('base64');
+
+    try {
+        const {data} = await axios.post(
+            'https://accounts.spotify.com/api/token',
+            body,
+            {
+                headers: {
+                    Authorization: `Basic ${authHeader}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
+        );
+        // Update server-side cache
+        accessToken = data.access_token;
+        expiresAt = Date.now() + data.expires_in * 1000;
+        // Return new access_token to client
+        res.json({access_token: data.access_token});
+    } catch (err) {
+        console.error('Refresh Error', err.response?.data || err.message);
+        res
+            .status(err.response?.status || 500)
+            .json(err.response?.data || {error: err.message});
+    }
 });
 
 module.exports = {
