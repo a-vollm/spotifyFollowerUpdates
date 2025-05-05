@@ -33,7 +33,7 @@ function ensureAccess() {
     return Promise.resolve()
 }
 
-router.get('/auth', (req, res) => {
+router.get('/auth/spotify', (req, res) => {
     const params = new URLSearchParams({
         client_id: CLIENT_ID,
         response_type: 'code',
@@ -70,4 +70,4 @@ router.get('/callback', (req, res) => {
         .catch(() => res.sendStatus(400))
 })
 
-module.exports = { router, ensureAccess, getAccessToken: () => accessToken }
+module.exports  = { router, ensureAccess, getAccessToken: () => accessToken }
