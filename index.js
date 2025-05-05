@@ -10,8 +10,7 @@ const cache = require('./cache')
 
 const app = express()
 app.use(cors({
-    origin: [process.env.FRONTEND_URL, 'https://accounts.spotify.com'],
-    methods: ['GET', 'POST'],
+    origin: process.env.FRONTEND_URL, 
     credentials: true
 }));
 app.use(express.json())
