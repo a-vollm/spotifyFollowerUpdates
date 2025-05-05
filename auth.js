@@ -12,6 +12,17 @@ let accessToken = ''
 let refreshToken = ''
 let expiresAt = 0
 
+router.get('/auth/spotify', (req, res) => {
+    console.log('SPOTIFY REDIRECT_URI (auth):', REDIRECT_URI);
+    const params = new URLSearchParams({
+        client_id: CLIENT_ID,
+        response_type: 'code',
+        redirect_uri: REDIRECT_URI,
+        scope: 'user-read-private user-read-email'
+    });
+    res.redirect('https://accounts.spotify.com/authorize?' + params.toString());
+});
+
 function ensureAccess() {
     if (!refreshToken) throw new Error('not authorized')
     if (Date.now() >= expiresAt) {
@@ -43,6 +54,7 @@ router.get('/auth/spotify', (req, res) => {
 })
 
 router.get('/auth/spotify/callback', async (req, res) => {
+    console.log('SPOTIFY REDIRECT_URI (callback):', REDIRECT_URI);
     const code = req.query.code
     const body = querystring.stringify({grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI})
     const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')
