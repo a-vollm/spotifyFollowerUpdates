@@ -48,7 +48,7 @@ router.get('/auth/spotify', (req, res) => {
         client_id: CLIENT_ID,
         response_type: 'code',
         redirect_uri: REDIRECT_URI,
-        scope: 'user-read-private user-read-email'
+        scope: 'user-read-private user-read-email user-follow-read user-library-read'
     })
     res.redirect('https://accounts.spotify.com/authorize?' + params.toString())
 })
