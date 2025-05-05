@@ -7,16 +7,16 @@ const cron = require('node-cron');
 const app = express();
 
 try {
-    const corsOptions = {
-        origin: [
-            'http://localhost:4200'
-        ],
-        methods: 'GET,POST,OPTIONS',
+    const allowedOrigins = process.env.NODE_ENV === 'production'
+        ? ['https://your-production-domain.com']
+        : ['http://localhost:4200'];
+
+    app.use(cors({
+        origin: allowedOrigins,
+        methods: ['GET', 'POST', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
         credentials: true
-    };
-    app.use(cors(corsOptions));
-    app.options('*', cors(corsOptions));
+    }));
 } catch (err) {
     console.error('CORS Setup Error:', err);
 }
