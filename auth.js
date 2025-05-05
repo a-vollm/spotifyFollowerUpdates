@@ -3,6 +3,7 @@ const express = require('express')
 const axios = require('axios')
 const querystring = require('querystring')
 const router = express.Router()
+const io = require('./socket').get()
 const CLIENT_ID     = process.env.SPOTIFY_CLIENT_ID
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET
 const REDIRECT_URI  = process.env.REDIRECT_URI
@@ -47,7 +48,6 @@ router.get('/auth/spotify', (req, res) => {
 
 router.get('/auth/spotify/callback', async (req, res) => {
     const code = req.query.code
-    // 1) Code gegen Tokens tauschen
     const body = querystring.stringify({
         grant_type:   'authorization_code',
         code,
@@ -66,18 +66,17 @@ router.get('/auth/spotify/callback', async (req, res) => {
             }
         }
     )
+
     accessToken  = data.access_token
     refreshToken = data.refresh_token
     expiresAt    = Date.now() + data.expires_in * 1000
 
-    // 2) Cache-Aufbau vollständig abwarten
+    // Cache neu aufbauen und danach Socket-Event senden
     const cache = require('./cache')
     await cache.rebuild()
+    io.emit('cacheUpdated')
 
-    // 3) Erst jetzt zum Frontend weiterleiten
-    res.redirect(
-        `${FRONTEND_URI}/callback?access_token=${accessToken}&refresh_token=${refreshToken}`
-    )
+    res.redirect(`${FRONTEND_URI}/callback?access_token=${accessToken}&refresh_token=${refreshToken}`)
 })
 
 module.exports = {

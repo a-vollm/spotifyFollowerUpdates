@@ -7,7 +7,7 @@ const cron = require('node-cron')
 const authRouter = require('./auth').router
 const cache = require('./cache')
 const routes = require('./routes')
-
+const socket = require('./socket')
 const app = express()
 app.use(cors())
 app.use(express.json())
@@ -15,7 +15,7 @@ app.use(authRouter)
 app.use(routes)
 
 const server = http.createServer(app)
-const io = new Server(server, { cors: { origin: '*' } })
+const io = socket.init(server);
 io.on('connection', () => {})
 
 cron.schedule('0 * * * *', () =>
