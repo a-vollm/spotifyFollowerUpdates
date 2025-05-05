@@ -54,31 +54,78 @@ router.get('/auth/spotify', (req, res) => {
 })
 
 router.get('/auth/spotify/callback', async (req, res) => {
-    console.log('SPOTIFY REDIRECT_URI (callback):', REDIRECT_URI);
-    const code = req.query.code
-    const body = querystring.stringify({grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI})
-    const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')
-    const {data} = await axios.post('https://accounts.spotify.com/api/token', body, {
-        headers: {
-            Authorization: `Basic ${authHeader}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-    })
-
-    accessToken = data.access_token
-    refreshToken = data.refresh_token
-    expiresAt = Date.now() + data.expires_in * 1000
-
-    const cache = require('./cache')
-    await cache.rebuild()
     try {
-        require('./socket').get().emit('cacheUpdated')
-    } catch {
+        console.log('[DEBUG] Callback erreicht. Query-Parameter:', req.query);
+        console.log('[DEBUG] Environment Variables:', {
+            CLIENT_ID: CLIENT_ID,
+            REDIRECT_URI: REDIRECT_URI,
+            FRONTEND_URI: FRONTEND_URI
+        });
+
+        if (!req.query.code) {
+            console.error('[ERROR] Kein Code-Parameter erhalten');
+            return res.status(400).send('Authorization code missing');
+        }
+
+        const code = req.query.code;
+        const body = querystring.stringify({
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: REDIRECT_URI
+        });
+
+        console.log('[DEBUG] Token Request Body:', body);
+
+        const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+
+        console.log('[DEBUG] Sende Token-Request an Spotify...');
+        const tokenResponse = await axios.post('https://accounts.spotify.com/api/token', body, {
+            headers: {
+                'Authorization': `Basic ${authHeader}`,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+
+        console.log('[DEBUG] Token Response:', tokenResponse.data);
+
+        accessToken = tokenResponse.data.access_token;
+        refreshToken = tokenResponse.data.refresh_token;
+        expiresAt = Date.now() + tokenResponse.data.expires_in * 1000;
+
+        console.log('[DEBUG] Tokens erhalten. Starte Cache-Rebuild...');
+        const cache = require('./cache');
+        await cache.rebuild();
+
+        try {
+            require('./socket').get().emit('cacheUpdated');
+        } catch (socketError) {
+            console.error('[WARN] Socket.io Error:', socketError.message);
+        }
+
+        console.log('[DEBUG] Weiterleitung an Frontend:', `${FRONTEND_URI}/callback`);
+        res.redirect(`${FRONTEND_URI}/callback?access_token=${accessToken}&refresh_token=${refreshToken}`);
+
+    } catch (error) {
+        console.error('[ERROR] Fehler im Callback-Handler:', error.response?.data || error.message);
+
+        if (error.response) {
+            console.error('[ERROR] Spotify API Response:', {
+                status: error.response.status,
+                data: error.response.data
+            });
+        }
+
+        res.status(500).send(`
+            <html>
+                <body>
+                    <h1>Authentication Failed</h1>
+                    <p>${error.message}</p>
+                    <a href="/auth/spotify">Try again</a>
+                </body>
+            </html>
+        `);
     }
-
-    res.redirect(`${FRONTEND_URI}/callback?access_token=${accessToken}&refresh_token=${refreshToken}`)
-})
-
+});
 // endpoint for token refresh
 router.get('/refresh', async (req, res) => {
     const token = req.query.refresh_token
