@@ -1,4 +1,3 @@
-// socket.js
 let io
 
 module.exports = {
