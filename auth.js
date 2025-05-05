@@ -43,31 +43,29 @@ router.get('/auth/spotify', (req, res) => {
     res.redirect('https://accounts.spotify.com/authorize?' + params.toString())
 })
 
-router.get('/callback', (req, res) => {
-    const code = req.query.code
-    axios
-        .post(
-            'https://accounts.spotify.com/api/token',
-            querystring.stringify({
-                grant_type: 'authorization_code',
-                code,
-                redirect_uri: REDIRECT_URI
-            }),
-            {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    Authorization: 'Basic ' +
-                        Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64')
-                }
+router.get('/auth/spotify/callback', async (req, res) => {
+    const code = req.query.code;
+    const body = querystring.stringify({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: REDIRECT_URI
+    });
+    const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+    const response = await axios.post(
+        'https://accounts.spotify.com/api/token',
+        body,
+        { headers: {
+                Authorization: `Basic ${authHeader}`,
+                'Content-Type': 'application/x-www-form-urlencoded'
             }
-        )
-        .then(r => {
-            accessToken = r.data.access_token
-            refreshToken = r.data.refresh_token
-            expiresAt = Date.now() + r.data.expires_in * 1000
-            res.redirect(`${REDIRECT_URI}?access_token=${accessToken}&refresh_token=${refreshToken}`)
-        })
-        .catch(() => res.sendStatus(400))
-})
+        }
+    );
+    accessToken  = response.data.access_token;
+    refreshToken = response.data.refresh_token;
+    expiresAt    = Date.now() + response.data.expires_in * 1000;
+
+    res.redirect(`${FRONTEND_URI}/callback?access_token=${accessToken}&refresh_token=${refreshToken}`);
+});
+
 
 module.exports  = { router, ensureAccess, getAccessToken: () => accessToken }
