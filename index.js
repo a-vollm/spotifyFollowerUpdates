@@ -8,7 +8,7 @@ const app = express();
 
 try {
     const allowedOrigins = process.env.NODE_ENV === 'production'
-        ? ['https://your-production-domain.com']
+        ? ['https://spotifyfollowerupdatesfrontend.onrender.com']
         : ['http://192.168.1.207:4200'];
 
     app.use(cors({
