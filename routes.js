@@ -24,7 +24,7 @@ router.get('/playlist/:id', ensureAuth, async (req, res) => {
         res.status(500).send({error: 'Failed to fetch playlist data'});
     }
 });
-router.get('/spotify/user/:id', ensureAuth, async (req, res) => {
+router.get('/map-username/:id', ensureAuth, async (req, res) => {
     const userId = req.params.id;
     try {
         const response = await axios.get(`https://api.spotify.com/v1/users/${userId}`, {
