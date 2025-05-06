@@ -1,5 +1,5 @@
 const express = require('express')
-const {getCacheStatus, getReleases, getLatest, getPlaylistData} = require('./cache')
+const {getCacheStatus, getReleases, getLatest, getPlaylistData, getSpotifyUser} = require('./cache')
 const {ensureAccess} = require('./auth')
 const router = express.Router()
 
@@ -24,21 +24,15 @@ router.get('/playlist/:id', ensureAuth, async (req, res) => {
         res.status(500).send({error: 'Failed to fetch playlist data'});
     }
 });
+
 router.get('/map-username/:id', ensureAuth, async (req, res) => {
     const userId = req.params.id;
     try {
-        const response = await axios.get(`https://api.spotify.com/v1/users/${userId}`, {
-            headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-            },
-        });
-        res.json({
-            id: response.data.id,
-            display_name: response.data.display_name,
-            external_urls: response.data.external_urls,
-        });
+        const user = await getSpotifyUser(userId);
+        res.json(user);
     } catch (error) {
         res.status(500).send('Error fetching user data from Spotify');
     }
 });
+
 module.exports = router

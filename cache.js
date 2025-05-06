@@ -124,10 +124,30 @@ async function getPlaylistData(playlistId) {
         throw new Error('Error fetching playlist data');
     }
 }
+
+async function getSpotifyUser(userId) {
+    const url = `https://api.spotify.com/v1/users/${userId}`;
+    try {
+        const response = await axios.get(url, {
+            headers: {
+                Authorization: `Bearer ${getAccessToken()}`,
+            },
+        });
+        return {
+            id: response.data.id,
+            display_name: response.data.display_name,
+            external_urls: response.data.external_urls,
+        };
+    } catch (error) {
+        throw new Error('Error fetching Spotify user');
+    }
+}
+
 module.exports = {
     rebuild,
     getCacheStatus,
     getReleases,
     getLatest,
-    getPlaylistData
+    getPlaylistData,
+    getSpotifyUser
 };
