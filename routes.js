@@ -25,14 +25,23 @@ router.get('/playlist/:id', ensureAuth, async (req, res) => {
     }
 });
 
-router.get('/map-username/:id', ensureAuth, async (req, res) => {
-    const userId = req.params.id;
-    try {
-        const user = await getSpotifyUser(userId);
-        res.json(user);
-    } catch (error) {
-        res.status(500).send('Error fetching user data from Spotify');
+router.post('/map-usernames', ensureAuth, async (req, res) => {
+    const ids = req.body.ids;
+    if (!Array.isArray(ids)) return res.status(400).json({error: 'ids must be an array'});
+
+    const unique = [...new Set(ids)];
+    const results = {};
+
+    for (const id of unique) {
+        try {
+            const user = await getSpotifyUser(id);
+            results[id] = user.display_name;
+        } catch {
+            results[id] = null;
+        }
     }
+
+    res.json(results);
 });
 
 module.exports = router
