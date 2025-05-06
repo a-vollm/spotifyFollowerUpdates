@@ -111,9 +111,23 @@ function getLatest() {
     return cachedLatest;
 }
 
+async function getPlaylistData(playlistId) {
+    const url = `https://api.spotify.com/v1/playlists/${playlistId}`;
+    try {
+        const response = await axios.get(url, {
+            headers: {
+                Authorization: `Bearer ${getAccessToken()}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        throw new Error('Error fetching playlist data');
+    }
+}
 module.exports = {
     rebuild,
     getCacheStatus,
     getReleases,
     getLatest,
+    getPlaylistData
 };
