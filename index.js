@@ -9,7 +9,7 @@ const app = express();
 try {
     const allowedOrigins = process.env.NODE_ENV === 'production'
         ? ['https://your-production-domain.com']
-        : ['http://localhost:4200'];
+        : ['http://192.168.1.207:4200'];
 
     app.use(cors({
         origin: allowedOrigins,
