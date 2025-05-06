@@ -4,7 +4,7 @@ module.exports = {
     init: server => {
         io = require('socket.io')(server, {
             cors: {
-                origin: '*',
+                origin: 'https://spotifyfollowerupdatesfrontend.onrender.com',
                 methods: ['GET', 'POST'],
                 credentials: true
             }
