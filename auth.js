@@ -7,9 +7,7 @@ const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET
 const FRONTEND_URI = process.env.FRONTEND_URI
 
-const REDIRECT_URI = process.env.NODE_ENV === 'production'
-    ? FRONTEND_URI
-    : 'http://localhost:4200/callback';
+const REDIRECT_URI = process.env.REDIRECT_URI
 
 let accessToken = ''
 let refreshToken = ''

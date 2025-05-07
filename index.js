@@ -7,9 +7,7 @@ const cron = require('node-cron');
 const app = express();
 
 try {
-    const allowedOrigins = process.env.NODE_ENV === 'production'
-        ? ['https://spotifyfollowerupdatesfrontend.onrender.com']
-        : ['http://192.168.1.207:4200'];
+    const allowedOrigins = [process.env.FRONTEND_URI]
 
     app.use(cors({
         origin: allowedOrigins,

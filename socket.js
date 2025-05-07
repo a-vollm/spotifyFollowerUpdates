@@ -3,9 +3,7 @@ let io;
 
 module.exports = {
     init: server => {
-        const allowedOrigins = process.env.NODE_ENV === 'production'
-            ? process.env.FRONTEND_URI
-            : ['http://localhost:4200'];
+        const allowedOrigins = [process.env.FRONTEND_URI]
 
         io = require('socket.io')(server, {
             cors: {
