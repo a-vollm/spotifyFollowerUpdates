@@ -38,21 +38,16 @@ try {
 const PORT = process.env.PORT || 4000;
 const server = http.createServer(app);
 
-// Socket.io Initialisierung
 try {
     const io = require('./socket').init(server);
     io.on('connection', () => console.log('Client connected'));
 
     // Cache mit Error-Handling
     const cache = require('./cache');
-    cache.rebuild()
-        .then(() => io.emit('cacheUpdated'))
-        .catch(err => console.error('Initial cache rebuild failed:', err));
+    cache.rebuild().then(() => io.emit('cacheUpdated')).catch(err => console.error('Initial cache rebuild failed:', err));
 
     cron.schedule('0 * * * *', () => {
-        cache.rebuild()
-            .then(() => io.emit('cacheUpdated'))
-            .catch(err => console.error('Scheduled cache rebuild failed:', err));
+        cache.rebuild().then(() => io.emit('cacheUpdated')).catch(err => console.error('Scheduled cache rebuild failed:', err));
     });
 
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

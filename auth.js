@@ -5,8 +5,11 @@ const router = express.Router()
 
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET
-const REDIRECT_URI = process.env.REDIRECT_URI
 const FRONTEND_URI = process.env.FRONTEND_URI
+
+const REDIRECT_URI = process.env.NODE_ENV === 'production'
+    ? FRONTEND_URI
+    : 'http://localhost:4200/callback';
 
 let accessToken = ''
 let refreshToken = ''
@@ -55,15 +58,7 @@ router.get('/auth/spotify', (req, res) => {
 
 router.get('/auth/spotify/callback', async (req, res) => {
     try {
-        console.log('[DEBUG] Callback erreicht. Query-Parameter:', req.query);
-        console.log('[DEBUG] Environment Variables:', {
-            CLIENT_ID: CLIENT_ID,
-            REDIRECT_URI: REDIRECT_URI,
-            FRONTEND_URI: FRONTEND_URI
-        });
-
         if (!req.query.code) {
-            console.error('[ERROR] Kein Code-Parameter erhalten');
             return res.status(400).send('Authorization code missing');
         }
 
