@@ -13,8 +13,28 @@ const ensureAuth = (req, res, next) => {
 }
 
 router.get('/cache-status', ensureAuth, (req, res) => res.json(getCacheStatus()))
-router.get('/releases/:year', ensureAuth, (req, res) => res.json(getReleases(req.params.year)))
-router.get('/latest', ensureAuth, (req, res) => res.json(getLatest()))
+router.get('/releases/:year', ensureAuth, (req, res) => {
+    const status = getCacheStatus();
+    if (status.loading) {
+        return res.status(202).json({loading: true});
+    }
+
+    const data = getReleases(req.params.year);
+    if (!data || data.length === 0) {
+        return res.status(404).json({error: 'No data yet'});
+    }
+
+    res.json(data);
+});
+
+router.get('/latest', ensureAuth, (req, res) => {
+    const status = getCacheStatus();
+    if (status.loading) {
+        return res.status(202).json({loading: true});
+    }
+    res.json(getLatest());
+});
+
 router.get('/playlist/:id', ensureAuth, async (req, res) => {
     const playlistId = req.params.id;
     try {
