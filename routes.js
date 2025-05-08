@@ -44,4 +44,14 @@ router.get('/playlist/:id', ensureAuth, async (req, res) => {
         res.status(500).send({error: 'Failed to fetch playlist data'});
     }
 });
+
+const subscriptions = [];
+
+router.post('/subscribe', express.json(), (req, res) => {
+    const sub = req.body;
+    const alreadyExists = subscriptions.some(s => JSON.stringify(s) === JSON.stringify(sub));
+    if (!alreadyExists) subscriptions.push(sub);
+    res.status(201).json({success: true});
+});
+
 module.exports = router

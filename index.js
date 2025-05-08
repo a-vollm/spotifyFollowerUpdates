@@ -5,7 +5,7 @@ const http = require('http');
 const cron = require('node-cron');
 
 const app = express();
-
+const webpush = require('web-push');
 try {
     const allowedOrigins = [process.env.FRONTEND_URI]
 
@@ -32,6 +32,7 @@ try {
     process.exit(1);
 }
 
+
 // Server starten
 const PORT = process.env.PORT || 4000;
 const server = http.createServer(app);
@@ -51,6 +52,31 @@ try {
 // Cron job  every minute
     cron.schedule('* * * * *', () => {
         io.emit('cacheUpdated')
+    });
+
+    webpush.setVapidDetails(
+        'mailto:dein@email.com',
+        process.env.VAPID_PUBLIC,
+        process.env.VAPID_PRIVATE
+    );
+
+    cron.schedule('* * * * *', async () => {
+        console.log('⏰ CRON: Sende Push...');
+        const payload = JSON.stringify({
+            title: 'Automatischer Push',
+            body: 'Dies ist eine Benachrichtigung jede Minute 🕐',
+            icon: '/assets/icons/icon-192x192.png',
+            badge: '/assets/icons/badge.png'
+        });
+
+        for (const sub of subscriptions) {
+            try {
+                await webpush.sendNotification(sub, payload);
+                console.log('✅ Push gesendet');
+            } catch (err) {
+                console.error('❌ Push-Fehler:', err);
+            }
+        }
     });
 
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
