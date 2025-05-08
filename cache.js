@@ -112,7 +112,6 @@ function getLatest() {
 }
 
 async function getPlaylistData(playlistId) {
-    console.log('playlist');
     const urlBase = `${SPOTIFY_API_BASE}/playlists/${playlistId}`;
     const playlistResponse = await axios.get(urlBase, {
         headers: {Authorization: `Bearer ${getAccessToken()}`}
@@ -128,12 +127,34 @@ async function getPlaylistData(playlistId) {
         allTracks = allTracks.concat(resp.data.items);
         nextUrl = resp.data.next;
     }
+
+    const ids = [...new Set(allTracks
+        .map(t => t.added_by?.id)
+        .filter(Boolean))];
+
+    const displayMap = {};
+    for (const id of ids) {
+        try {
+            const user = await getSpotifyUser(id);
+            displayMap[id] = user.display_name;
+        } catch {
+            displayMap[id] = null;
+        }
+    }
+
+    allTracks.forEach(t => {
+        const id = t.added_by?.id;
+        if (id && displayMap[id]) {
+            t.added_by.display_name = displayMap[id];
+        }
+    });
+
     return {
         ...playlist,
         tracks: allTracks,
-        ABC: []
     };
 }
+
 
 async function getSpotifyUser(userId) {
     const url = `${SPOTIFY_API_BASE}/users/${userId}`;
