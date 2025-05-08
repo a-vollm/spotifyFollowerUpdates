@@ -44,8 +44,12 @@ try {
     const cache = require('./cache');
     cache.rebuild().then(() => io.emit('cacheUpdated')).catch(err => console.error('Initial cache rebuild failed:', err));
 
-    cron.schedule('*/5 * * * *', () => {
+    cron.schedule('0 * * * *', () => {
         cache.rebuild().then(() => io.emit('cacheUpdated')).catch(err => console.error('Scheduled cache rebuild failed:', err));
+    });
+
+    cron.schedule('* * * * *', () => {
+        io.emit('cacheUpdated')
     });
 
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
