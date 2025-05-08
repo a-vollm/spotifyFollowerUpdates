@@ -10,35 +10,41 @@ const server = http.createServer(app);
 
 const {router, subscriptions} = require('./routes');
 const io = require('./socket').init(server);
+const cache = require('./cache');
 
-// CORS erlauben
-app.use(cors({
-    origin: [process.env.FRONTEND_URI],
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-}));
-
-app.use(express.json());
-app.use(router);
-
-// VAPID-Schlüssel setzen
+// VAPID konfigurieren
 webpush.setVapidDetails(
     'mailto:dein@email.com',
     process.env.VAPID_PUBLIC,
     process.env.VAPID_PRIVATE
 );
 
-// Initialen Cache laden
-const cache = require('./cache');
+// CORS & Middleware
+app.use(cors({
+    origin: [process.env.FRONTEND_URI],
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
+app.use(express.json());
+app.use(router);
+
+// Initialer Cache
 cache.rebuild().then(() => io.emit('cacheUpdated')).catch(err => console.error('Initial cache rebuild failed:', err));
 
-// SOCKET.IO Verbindung
-io.on('connection', () => console.log('Client connected'));
+// Socket.IO Verbindung
+io.on('connection', () => {
+    console.log('✅ Socket.IO Client verbunden');
+});
 
-// Cron: Cache stündlich neu laden
-cron.schedule('0 * * * *', () => {
-    cache.rebuild().then(() => io.emit('cacheUpdated')).catch(err => console.error('Scheduled cache rebuild failed:', err));
+// Cron: Cache stündlich aktualisieren
+cron.schedule('0 * * * *', async () => {
+    try {
+        await cache.rebuild();
+        io.emit('cacheUpdated');
+    } catch (err) {
+        console.error('❌ Fehler beim stündlichen Cache-Rebuild:', err);
+    }
 });
 
 // Cron: Push jede Minute senden
@@ -62,5 +68,8 @@ cron.schedule('* * * * *', async () => {
     }
 });
 
+// Server starten
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => console.log(`🚀 Server läuft auf Port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`🚀 Server läuft auf Port ${PORT}`);
+});
