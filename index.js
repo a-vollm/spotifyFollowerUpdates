@@ -44,10 +44,11 @@ try {
     const cache = require('./cache');
     cache.rebuild().then(() => io.emit('cacheUpdated')).catch(err => console.error('Initial cache rebuild failed:', err));
 
+    // Cron job for rebuilding cached app data every hour
     cron.schedule('0 * * * *', () => {
-        cache.rebuild().then(() => io.emit('cacheUpdated')).catch(err => console.error('Scheduled cache rebuild failed:', err));
+        cache.rebuild().then(() => io.emit('socketTest')).catch(err => console.error('Scheduled cache rebuild failed:', err));
     });
-
+// Cron job  every minute
     cron.schedule('* * * * *', () => {
         io.emit('cacheUpdated')
     });
