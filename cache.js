@@ -112,12 +112,12 @@ function getLatest() {
 }
 
 async function getPlaylistData(playlistId: string) {
+    console.log('playlist');
     const urlBase = `${SPOTIFY_API_BASE}/playlists/${playlistId}`;
     const playlistResponse = await axios.get(urlBase, {
         headers: {Authorization: `Bearer ${getAccessToken()}`}
     });
     const playlist = playlistResponse.data;
-    console.log('playlist');
     let allTracks: any[] = [];
     let nextUrl: string | null = `${urlBase}/tracks?limit=100&offset=0`;
 
