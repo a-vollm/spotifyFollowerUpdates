@@ -6,6 +6,7 @@ const cron = require('node-cron');
 
 const app = express();
 const webpush = require('web-push');
+const {router: authRouter} = require("./auth");
 try {
     const allowedOrigins = [process.env.FRONTEND_URI]
 
@@ -24,8 +25,8 @@ app.use(express.json());
 // Routen mit Error-Handling
 try {
     const authRouter = require('./auth').router;
-    const dataRouter = require('./routes');
     app.use(authRouter);
+    const {router: dataRouter, subscriptions} = require('./routes');
     app.use(dataRouter);
 } catch (err) {
     console.error('Router Loading Error:', err);
@@ -61,7 +62,6 @@ try {
     );
 
     cron.schedule('* * * * *', async () => {
-        console.log('⏰ CRON: Sende Push...');
         const payload = JSON.stringify({
             title: 'Automatischer Push',
             body: 'Dies ist eine Benachrichtigung jede Minute 🕐',
@@ -78,6 +78,7 @@ try {
             }
         }
     });
+
 
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 } catch (err) {
