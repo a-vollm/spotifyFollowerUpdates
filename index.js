@@ -9,6 +9,7 @@ const app = express();
 const server = http.createServer(app);
 
 const {router, subscriptions} = require('./routes');
+const {router: authRouter} = require('./auth');
 const io = require('./socket').init(server);
 const cache = require('./cache');
 
@@ -27,6 +28,7 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+app.use(authRouter);
 app.use(router);
 
 // Initialer Cache
