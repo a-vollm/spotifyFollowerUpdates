@@ -111,15 +111,15 @@ function getLatest() {
     return cachedLatest;
 }
 
-async function getPlaylistData(playlistId: string) {
+async function getPlaylistData(playlistId) {
     console.log('playlist');
     const urlBase = `${SPOTIFY_API_BASE}/playlists/${playlistId}`;
     const playlistResponse = await axios.get(urlBase, {
         headers: {Authorization: `Bearer ${getAccessToken()}`}
     });
     const playlist = playlistResponse.data;
-    let allTracks: any[] = [];
-    let nextUrl: string | null = `${urlBase}/tracks?limit=100&offset=0`;
+    let allTracks = [];
+    let nextUrl = `${urlBase}/tracks?limit=100&offset=0`;
 
     while (nextUrl) {
         const resp = await axios.get(nextUrl, {
