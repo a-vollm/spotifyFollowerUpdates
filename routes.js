@@ -1,5 +1,5 @@
 const express = require('express')
-const {getCacheStatus, getReleases, getLatest, getPlaylistData, getSpotifyUser} = require('./cache')
+const {getCacheStatus, getReleases, getLatest, getPlaylistData} = require('./cache')
 const {ensureAccess} = require('./auth')
 const router = express.Router()
 const subscriptions = [];
@@ -57,6 +57,3 @@ module.exports = {
     router,
     subscriptions
 };
-
-
-module.exports = router
