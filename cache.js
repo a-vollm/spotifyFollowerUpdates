@@ -117,7 +117,7 @@ async function getPlaylistData(playlistId: string) {
         headers: {Authorization: `Bearer ${getAccessToken()}`}
     });
     const playlist = playlistResponse.data;
-
+    console.log('playlist');
     let allTracks: any[] = [];
     let nextUrl: string | null = `${urlBase}/tracks?limit=100&offset=0`;
 
@@ -128,10 +128,10 @@ async function getPlaylistData(playlistId: string) {
         allTracks = allTracks.concat(resp.data.items);
         nextUrl = resp.data.next;
     }
-    console.log('allTracks');
     return {
         ...playlist,
-        tracks: allTracks
+        tracks: allTracks,
+        ABC: []
     };
 }
 
