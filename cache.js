@@ -128,7 +128,7 @@ async function getPlaylistData(playlistId: string) {
         allTracks = allTracks.concat(resp.data.items);
         nextUrl = resp.data.next;
     }
-
+    console.log('allTracks');
     return {
         ...playlist,
         tracks: allTracks
