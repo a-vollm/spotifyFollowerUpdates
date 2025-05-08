@@ -112,22 +112,31 @@ function getLatest() {
 }
 
 async function getPlaylistData(playlistId) {
+    const limit = 1000;
+    let offset = 0;
+    let allTracks = [];
     const accessToken = getAccessToken();
 
-    const [meta, tracks] = await Promise.all([
-        axios.get(`${SPOTIFY_API_BASE}/playlists/${playlistId}`, {
-            headers: {Authorization: `Bearer ${accessToken}`}
-        }),
-        getAllPlaylistTracks(playlistId)
-    ]);
+    try {
+        while (true) {
+            const response = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+                params: {limit, offset}
+            });
 
-    return {
-        ...meta.data,
-        tracks: {
-            ...meta.data.tracks,
-            items: tracks
+            allTracks.push(...response.data.items);
+
+            if (!response.data.next) break;
+            offset += limit;
         }
-    };
+
+        return allTracks;
+    } catch (error) {
+        console.error(error);
+        throw new Error('Fehler beim Laden aller Playlist-Tracks');
+    }
 }
 
 async function getSpotifyUser(userId) {
