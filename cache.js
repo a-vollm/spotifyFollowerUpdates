@@ -112,21 +112,26 @@ function getLatest() {
 }
 
 async function getPlaylistData(playlistId) {
-    const url = `https://api.spotify.com/v1/playlists/${playlistId}`;
-    try {
-        const response = await axios.get(url, {
-            headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-            },
-        });
-        return response.data;
-    } catch (error) {
-        throw new Error('Error fetching playlist data');
-    }
+    const accessToken = getAccessToken();
+
+    const [meta, tracks] = await Promise.all([
+        axios.get(`${SPOTIFY_API_BASE}/playlists/${playlistId}`, {
+            headers: {Authorization: `Bearer ${accessToken}`}
+        }),
+        getAllPlaylistTracks(playlistId)
+    ]);
+
+    return {
+        ...meta.data,
+        tracks: {
+            ...meta.data.tracks,
+            items: tracks
+        }
+    };
 }
 
 async function getSpotifyUser(userId) {
-    const url = `https://api.spotify.com/v1/users/${userId}`;
+    const url = `${SPOTIFY_API_BASE}/users/${userId}`;
     try {
         const response = await axios.get(url, {
             headers: {
