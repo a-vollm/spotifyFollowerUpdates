@@ -111,32 +111,28 @@ function getLatest() {
     return cachedLatest;
 }
 
-async function getPlaylistData(playlistId) {
-    const limit = 1000;
-    let offset = 0;
-    let allTracks = [];
-    const accessToken = getAccessToken();
+async function getPlaylistData(playlistId: string) {
+    const urlBase = `${SPOTIFY_API_BASE}/playlists/${playlistId}`;
+    const playlistResponse = await axios.get(urlBase, {
+        headers: {Authorization: `Bearer ${getAccessToken()}`}
+    });
+    const playlist = playlistResponse.data;
 
-    try {
-        while (true) {
-            const response = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
-                params: {limit, offset}
-            });
+    let allTracks: any[] = [];
+    let nextUrl: string | null = `${urlBase}/tracks?limit=100&offset=0`;
 
-            allTracks.push(...response.data.items);
-
-            if (!response.data.next) break;
-            offset += limit;
-        }
-
-        return allTracks;
-    } catch (error) {
-        console.error(error);
-        throw new Error('Fehler beim Laden aller Playlist-Tracks');
+    while (nextUrl) {
+        const resp = await axios.get(nextUrl, {
+            headers: {Authorization: `Bearer ${getAccessToken()}`}
+        });
+        allTracks = allTracks.concat(resp.data.items);
+        nextUrl = resp.data.next;
     }
+
+    return {
+        ...playlist,
+        tracks: allTracks
+    };
 }
 
 async function getSpotifyUser(userId) {
