@@ -12,11 +12,13 @@ const FRONTEND_URI = process.env.FRONTEND_URI;
 router.get('/auth/spotify', (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
 
+    const redirect_uri = `${BACKEND_URI}`;
+
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: CLIENT_ID,
         scope: 'user-read-private user-read-email user-follow-read user-library-read',
-        BACKEND_URI,
+        redirect_uri,
         state
     });
 
