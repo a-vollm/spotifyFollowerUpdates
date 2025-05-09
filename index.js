@@ -21,16 +21,16 @@ webpush.setVapidDetails(
     process.env.VAPID_PRIVATE
 );
 
-// CORS & Middleware
+app.set('trust proxy', true);
+app.use(cookieParser());
 app.use(cors({
     origin: process.env.FRONTEND_URI,
     methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
     exposedHeaders: ['set-cookie'],
     credentials: true
 }));
-app.set('trust proxy', 1);
 app.use(express.json());
-app.use(cookieParser());
 app.use(authRouter);
 app.use(router);
 
