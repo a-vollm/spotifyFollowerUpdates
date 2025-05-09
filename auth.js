@@ -6,7 +6,7 @@ const crypto = require('crypto');
 
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-const BACKEND_URI = process.env.BACKEND_URI;
+const BACKEND_URI = process.env.REDIRECT_URI;
 const FRONTEND_URI = process.env.FRONTEND_URI;
 
 router.get('/auth/spotify', (req, res) => {
