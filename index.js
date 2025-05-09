@@ -12,8 +12,9 @@ const {router, subscriptions} = require('./routes');
 const {router: authRouter} = require('./auth');
 const io = require('./socket').init(server);
 const cache = require('./cache');
+const path = require('path');
 
-// VAPID konfigurieren
+
 webpush.setVapidDetails(
     'mailto:dein@email.com',
     process.env.VAPID_PUBLIC,
@@ -30,6 +31,13 @@ app.use(cors({
 app.use(express.json());
 app.use(authRouter);
 app.use(router);
+app.use(express.static(path.join(__dirname, 'www')));
+
+// Fallback für Angular-Routen (z.B. /callback, /playlist, etc.)
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'www', 'index.html'));
+});
+
 
 // Initialer Cache
 cache.rebuild().then(() => io.emit('cacheUpdated')).catch(err => console.error('Initial cache rebuild failed:', err));
