@@ -96,7 +96,7 @@ router.get('/auth/spotify/callback', async (req, res) => {
         }
 
         console.log('[DEBUG] Weiterleitung an Frontend:', `${FRONTEND_URI}/callback`);
-        res.redirect(`${FRONTEND_URI}/callback?access_token=${accessToken}&refresh_token=${refreshToken}`);
+        res.redirect(`${FRONTEND_URI}/#/callback?access_token=${accessToken}&refresh_token=${refreshToken}`);
 
     } catch (error) {
         console.error('[ERROR] Fehler im Callback-Handler:', error.response?.data || error.message);
