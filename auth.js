@@ -82,11 +82,13 @@ router.get('/auth/spotify/callback', async (req, res) => {
 
 router.get('/check-auth', (req, res) => {
     try {
+        if (!req.cookies) return res.status(401).send();
+
         const sessionId = req.cookies.sessionId;
         if (!sessionId) return res.status(401).send();
 
         const session = sessions.get(sessionId);
-        if (!session) {
+        if (!session || Date.now() >= session.expires_at) {
             res.clearCookie('sessionId');
             return res.status(401).send();
         }
