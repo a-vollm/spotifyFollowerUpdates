@@ -85,6 +85,9 @@ router.get('/auth/spotify/callback', async (req, res) => {
 router.get('/check-auth', (req, res) => {
     console.log('check-auth called');  // 🟡 Debug-Log
     try {
+        console.log('Raw Headers:', req.headers);
+        console.log('Host:', req.get('host'));
+        console.log('X-Forwarded-Proto:', req.get('x-forwarded-proto'));
         console.log('Cookies:', req.cookies);
         console.log('Headers:', req.headers.cookie)
         if (!req.cookies) return res.status(401).send();
