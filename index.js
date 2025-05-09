@@ -50,6 +50,7 @@ cron.schedule('0 * * * *', async () => {
 
 // Cron: Push jede Minute senden
 cron.schedule('* * * * *', async () => {
+    console.log('✅ Push ???');
     if (!subscriptions.length) return;
 
     const payload = JSON.stringify({
