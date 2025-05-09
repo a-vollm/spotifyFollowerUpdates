@@ -72,7 +72,8 @@ router.get('/auth/spotify/callback', async (req, res) => {
             sameSite: 'none',
             secure: true,
             maxAge: 3600 * 1000,
-            domain: '.onrender.com'
+            domain: 'spotifyfollowerupdates.onrender.com',
+            path: '/',
         }).redirect(`${FRONTEND_URI}/`);
 
     } catch (err) {
