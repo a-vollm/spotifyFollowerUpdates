@@ -5,13 +5,20 @@ const router = express.Router()
 const subscriptions = [];
 
 const ensureAuth = (req, res, next) => {
-    try {
-        ensureAccess();
-        next()
-    } catch {
-        res.sendStatus(401)
+    const sessionId = req.cookies.sessionId;
+
+    if (!sessionId) return res.sendStatus(401);
+
+    const session = sessions.get(sessionId);
+    if (!session || Date.now() >= session.expires_at) {
+        res.clearCookie('sessionId');
+        return res.sendStatus(401);
     }
-}
+
+    // Token an Request hängen
+    req.access_token = session.access_token;
+    next();
+};
 
 router.get('/cache-status', ensureAuth, (req, res) => res.json(getCacheStatus()))
 router.get('/releases/:year', ensureAuth, (req, res) => {

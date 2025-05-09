@@ -80,37 +80,20 @@ router.get('/auth/spotify/callback', async (req, res) => {
     }
 });
 
-// Füge diese Route hinzu
 router.get('/check-auth', (req, res) => {
     try {
         const sessionId = req.cookies.sessionId;
-
-        if (!sessionId) {
-            return res.status(401).send();
-        }
+        if (!sessionId) return res.status(401).send();
 
         const session = sessions.get(sessionId);
-
-        if (!session || Date.now() >= session.expires_at) {
+        if (!session) {
             res.clearCookie('sessionId');
             return res.status(401).send();
         }
 
-        // Optional: Token-Refresh vor Ablauf
-        if (Date.now() >= session.expires_at - 60000) {
-            refreshSpotifyToken(session.refresh_token)
-                .then(newTokens => {
-                    sessions.set(sessionId, {
-                        ...session,
-                        ...newTokens
-                    });
-                });
-        }
-
         res.status(200).send();
-
     } catch (error) {
-        console.error('Auth check failed:', error);
+        console.error('Auth check error:', error);
         res.status(500).send();
     }
 });

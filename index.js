@@ -9,7 +9,7 @@ const app = express();
 const server = http.createServer(app);
 
 const {router, subscriptions} = require('./routes');
-const {router: authRouter} = require('./auth');
+const {router: authRouter, sessions, refreshSpotifyToken} = require('./auth');
 const io = require('./socket').init(server);
 const cache = require('./cache');
 
@@ -24,7 +24,7 @@ webpush.setVapidDetails(
 app.use(cors({
     origin: [process.env.FRONTEND_URI],
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['set-cookie'],
     credentials: true
 }));
 app.use(express.json());
@@ -70,7 +70,6 @@ cron.schedule('* * * * *', async () => {
     }
 });
 
-// Cron-Jobs
 cron.schedule('*/5 * * * *', () => {
     sessions.forEach(async (session, sessionId) => {
         if (Date.now() >= session.expires_at - 120000) {
