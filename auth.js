@@ -88,6 +88,8 @@ router.get('/check-auth', (req, res) => {
         if (!sessionId) return res.status(401).send();
 
         const session = sessions.get(sessionId);
+        console.log('Session ID:', sessionId);  // 🟡 Debug-Log
+        console.log('Sessions:', sessions);     // 🟡 Debug-Log
         if (!session || Date.now() >= session.expires_at) {
             res.clearCookie('sessionId');
             return res.status(401).send();
