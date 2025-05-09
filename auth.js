@@ -12,13 +12,11 @@ const FRONTEND_URI = process.env.FRONTEND_URI;
 router.get('/auth/spotify', (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
 
-    const redirect_uri = `${BACKEND_URI}/auth/spotify/callback`; // exakt wie bei Spotify
-
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: CLIENT_ID,
         scope: 'user-read-private user-read-email user-follow-read user-library-read',
-        redirect_uri,
+        BACKEND_URI,
         state
     });
 
@@ -34,7 +32,7 @@ router.get('/auth/spotify/callback', async (req, res) => {
             querystring.stringify({
                 grant_type: 'authorization_code',
                 code,
-                redirect_uri: `${BACKEND_URI}/auth/spotify/callback` // exakt gleich wie oben
+                redirect_uri: `${BACKEND_URI}` // exakt gleich wie oben
             }),
             {
                 headers: {
