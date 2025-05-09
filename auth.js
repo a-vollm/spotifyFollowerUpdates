@@ -1,4 +1,13 @@
+const express = require('express');
+const router = express.Router();
+const axios = require('axios');
+const querystring = require('querystring');
 const crypto = require('crypto');
+
+const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+const BACKEND_URI = process.env.BACKEND_URI;
+const FRONTEND_URI = process.env.FRONTEND_URI;
 
 router.get('/auth/spotify', (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
@@ -44,3 +53,5 @@ router.get('/auth/spotify/callback', async (req, res) => {
         res.redirect(`${FRONTEND_URI}/callback?error=auth_failed`);
     }
 });
+
+module.exports = {initAuth: (app) => app.use(router)};
