@@ -48,7 +48,7 @@ router.get('/auth/spotify/callback', async (req, res) => {
         const {access_token, refresh_token, expires_in} = response.data;
 
         // Leite ans Frontend weiter mit Token in der URL (NICHT als Cookie!)
-        res.redirect(`${FRONTEND_URI}/callback?access_token=${access_token}&refresh_token=${refresh_token}&expires_in=${expires_in}`);
+        res.redirect(`${FRONTEND_URI}/callback?code=${code}`);
     } catch (err) {
         console.error('Spotify Callback Error:', err.response?.data || err);
         res.redirect(`${FRONTEND_URI}/callback?error=auth_failed`);
