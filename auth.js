@@ -9,6 +9,8 @@ const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const BACKEND_URI = process.env.REDIRECT_URI;
 const FRONTEND_URI = process.env.FRONTEND_URI;
 
+private
+refreshInProgress = false;
 router.get('/auth/spotify', (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
 

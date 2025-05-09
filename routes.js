@@ -20,7 +20,7 @@ router.get('/cache-status', ensureAuth, (req, res) => {
 router.get('/releases/:year', ensureAuth, (req, res) => {
     const stat = getCacheStatus();
     if (stat.loading) return res.status(202).json({loading: true});
-    const data = getReleases(req.params.year, req.access_token);
+    const data = getReleases(req.params.year);
     if (!data || data.length === 0) return res.status(404).json({error: 'No data yet'});
     res.json(data);
 });
@@ -36,7 +36,7 @@ router.get('/latest', ensureAuth, (req, res) => {
 router.get('/playlist/:id', ensureAuth, async (req, res) => {
     try {
         const playlist = await getPlaylistData(req.params.id, req.access_token);
-        res.json(playlist);
+        res.json(getLatest());
     } catch {
         res.status(500).json({error: 'fetch_playlist_failed'});
     }
