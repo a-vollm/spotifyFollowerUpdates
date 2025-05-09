@@ -23,11 +23,12 @@ webpush.setVapidDetails(
 
 // CORS & Middleware
 app.use(cors({
-    origin: [process.env.FRONTEND_URI],
+    origin: process.env.FRONTEND_URI,
     methods: ['GET', 'POST', 'OPTIONS'],
     exposedHeaders: ['set-cookie'],
     credentials: true
 }));
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cookieParser());
 app.use(authRouter);
