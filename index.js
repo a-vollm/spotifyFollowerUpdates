@@ -21,7 +21,7 @@ webpush.setVapidDetails(
     process.env.VAPID_PRIVATE
 );
 
-app.set('trust proxy', true);
+app.set('trust proxy', 2);
 app.use(cookieParser());
 app.use(cors({
     origin: process.env.FRONTEND_URI,

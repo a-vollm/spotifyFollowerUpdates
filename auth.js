@@ -85,6 +85,8 @@ router.get('/auth/spotify/callback', async (req, res) => {
 router.get('/check-auth', (req, res) => {
     console.log('check-auth called');  // 🟡 Debug-Log
     try {
+        console.log('X-Forwarded-For:', req.get('x-forwarded-for'));
+        console.log('X-Real-IP:', req.get('x-real-ip'));
         console.log('Raw Headers:', req.headers);
         console.log('Host:', req.get('host'));
         console.log('X-Forwarded-Proto:', req.get('x-forwarded-proto'));

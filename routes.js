@@ -5,7 +5,7 @@ const router = express.Router()
 const subscriptions = [];
 
 const ensureAuth = (req, res, next) => {
-    const sessionId = req.cookies.sessionId;
+    const sessionId = req.cookies.sessionId || req.headers.authorization?.split(' ')[1];
 
     if (!sessionId) return res.sendStatus(401);
 
