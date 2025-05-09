@@ -13,6 +13,7 @@ const {router: authRouter} = require('./auth');
 const io = require('./socket').init(server);
 const cache = require('./cache');
 
+// VAPID konfigurieren
 webpush.setVapidDetails(
     'mailto:dein@email.com',
     process.env.VAPID_PUBLIC,
@@ -50,7 +51,6 @@ cron.schedule('0 * * * *', async () => {
 
 // Cron: Push jede Minute senden
 cron.schedule('* * * * *', async () => {
-    console.log('✅ Push ???');
     if (!subscriptions.length) return;
 
     const payload = JSON.stringify({
@@ -68,6 +68,20 @@ cron.schedule('* * * * *', async () => {
             console.error('❌ Push-Fehler:', err);
         }
     }
+});
+
+// Cron-Jobs
+cron.schedule('*/5 * * * *', () => {
+    sessions.forEach(async (session, sessionId) => {
+        if (Date.now() >= session.expires_at - 120000) {
+            try {
+                const newTokens = await refreshSpotifyToken(session.refresh_token);
+                sessions.set(sessionId, {...session, ...newTokens});
+            } catch (error) {
+                sessions.delete(sessionId);
+            }
+        }
+    });
 });
 
 // Server starten

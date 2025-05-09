@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const querystring = require('querystring');
+const crypto = require('crypto');
 const router = express.Router();
 
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
@@ -8,10 +9,7 @@ const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const FRONTEND_URI = process.env.FRONTEND_URI;
 const REDIRECT_URI = process.env.REDIRECT_URI;
 
-let accessToken = '';
-let refreshToken = '';
-let expiresAt = 0;
-let refreshInProgress = null;
+const sessions = new Map();
 
 router.get('/auth/spotify', (req, res) => {
     const params = new URLSearchParams({
@@ -23,89 +21,73 @@ router.get('/auth/spotify', (req, res) => {
     res.redirect(`https://accounts.spotify.com/authorize?${params}`);
 });
 
-async function ensureAccess() {
-    if (!refreshToken) throw new Error('Not authorized');
-    if (Date.now() < expiresAt - 60000) return accessToken;
-
-    if (refreshInProgress) {
-        await refreshInProgress;
-        return accessToken;
-    }
-
-    refreshInProgress = axios.post('https://accounts.spotify.com/api/token',
-        querystring.stringify({grant_type: 'refresh_token', refresh_token: refreshToken}),
+async function refreshSpotifyToken(refreshToken) {
+    const response = await axios.post(
+        'https://accounts.spotify.com/api/token',
+        querystring.stringify({
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken
+        }),
         {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 Authorization: 'Basic ' + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')
             }
         }
-    ).then(response => {
-        accessToken = response.data.access_token;
-        expiresAt = Date.now() + response.data.expires_in * 1000;
-    }).finally(() => {
-        refreshInProgress = null;
-    });
-
-    await refreshInProgress;
-    return accessToken;
+    );
+    return {
+        access_token: response.data.access_token,
+        expires_at: Date.now() + response.data.expires_in * 1000
+    };
 }
 
 router.get('/auth/spotify/callback', async (req, res) => {
-    const code = req.query.code;
-    if (!code) return res.status(400).send('Authorization code missing');
-
     try {
-        const body = querystring.stringify({
-            grant_type: 'authorization_code',
-            code,
-            redirect_uri: REDIRECT_URI
-        });
-        const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
-        const tokenResp = await axios.post('https://accounts.spotify.com/api/token', body, {
-            headers: {
-                'Authorization': `Basic ${authHeader}`,
-                'Content-Type': 'application/x-www-form-urlencoded'
+        const code = req.query.code;
+        if (!code) throw new Error('Authorization code missing');
+
+        const tokenResp = await axios.post('https://accounts.spotify.com/api/token',
+            querystring.stringify({
+                grant_type: 'authorization_code',
+                code,
+                redirect_uri: REDIRECT_URI
+            }),
+            {
+                headers: {
+                    'Authorization': 'Basic ' + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64'),
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
             }
+        );
+
+        const sessionId = crypto.randomUUID();
+        sessions.set(sessionId, {
+            access_token: tokenResp.data.access_token,
+            refresh_token: tokenResp.data.refresh_token,
+            expires_at: Date.now() + tokenResp.data.expires_in * 1000
         });
 
-        accessToken = tokenResp.data.access_token;
-        refreshToken = tokenResp.data.refresh_token;
-        expiresAt = Date.now() + tokenResp.data.expires_in * 1000;
+        res.cookie('sessionId', sessionId, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 3600 * 1000
+        }).redirect(`${FRONTEND_URI}/`);
 
-        const cache = require('./cache');
-        cache.rebuild().catch(() => {
-        });
-        try {
-            require('./socket').get().emit('cacheUpdated');
-        } catch {
-        }
-
-        res.redirect(`${FRONTEND_URI}/#/callback?access_token=${accessToken}&refresh_token=${refreshToken}`);
     } catch (err) {
-        res.status(500).send(`<h1>Authentication Failed</h1><p>${err.message}</p>`);
+        console.error('Auth error:', err);
+        res.redirect(`${FRONTEND_URI}/?error=auth_failed`);
     }
 });
 
-router.get('/refresh', async (req, res) => {
-    const token = req.query.refresh_token;
-    if (!token) return res.status(400).json({error: 'Missing refresh_token'});
-
-    const body = querystring.stringify({grant_type: 'refresh_token', refresh_token: token});
-    const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
-    try {
-        const {data} = await axios.post('https://accounts.spotify.com/api/token', body, {
-            headers: {
-                Authorization: `Basic ${authHeader}`,
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        });
-        accessToken = data.access_token;
-        expiresAt = Date.now() + data.expires_in * 1000;
-        res.json({access_token: data.access_token});
-    } catch (err) {
-        res.status(err.response?.status || 500).json(err.response?.data || {error: err.message});
-    }
+router.post('/logout', (req, res) => {
+    const sessionId = req.cookies.sessionId;
+    sessions.delete(sessionId);
+    res.clearCookie('sessionId').sendStatus(200);
 });
 
-module.exports = {router, ensureAccess, getAccessToken: () => accessToken};
+module.exports = {
+    router,
+    sessions,
+    refreshSpotifyToken
+};
