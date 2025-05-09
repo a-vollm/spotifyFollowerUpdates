@@ -1,6 +1,6 @@
 const express = require('express')
 const {getCacheStatus, getReleases, getLatest, getPlaylistData} = require('./cache')
-const {ensureAccess} = require('./auth')
+const {sessions} = require('./auth')
 const router = express.Router()
 const subscriptions = [];
 
