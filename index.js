@@ -12,6 +12,7 @@ const {router, subscriptions} = require('./routes');
 const {router: authRouter, sessions, refreshSpotifyToken} = require('./auth');
 const io = require('./socket').init(server);
 const cache = require('./cache');
+const cookieParser = require('cookie-parser');
 
 // VAPID konfigurieren
 webpush.setVapidDetails(
@@ -28,6 +29,7 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+app.use(cookieParser());
 app.use(authRouter);
 app.use(router);
 
