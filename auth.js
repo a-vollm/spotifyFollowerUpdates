@@ -69,8 +69,8 @@ router.get('/auth/spotify/callback', async (req, res) => {
 
         res.cookie('sessionId', sessionId, {
             httpOnly: true,
-            sameSite: 'lax',
-            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'none',
+            secure: true,
             maxAge: 3600 * 1000
         }).redirect(`${FRONTEND_URI}/`);
 
