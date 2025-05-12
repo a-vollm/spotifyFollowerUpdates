@@ -4,12 +4,16 @@ const router = express.Router();
 const subscriptions = [];
 
 // Authorization via Bearer‐Header (gesetzt über Interceptor im Frontend)
+const {setAccessToken} = require('./auth');
+
 const ensureAuth = (req, res, next) => {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) return res.sendStatus(401);
-    req.access_token = auth.split(' ')[1];
+    const token = auth.split(' ')[1];
+    setAccessToken(token);          // ⬅️ Token für cache.js speichern
     next();
 };
+
 
 // Cache-Status
 router.get('/cache-status', ensureAuth, (req, res) => {

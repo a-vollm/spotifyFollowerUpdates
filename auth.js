@@ -69,4 +69,18 @@ router.post('/auth/refresh', async (req, res) => {
     res.json({access_token, expires_in});
 });
 
-module.exports = {initAuth: app => app.use(router)};
+let currentAccessToken = null;
+
+function setAccessToken(token) {
+    currentAccessToken = token;
+}
+
+function getAccessToken() {
+    return currentAccessToken;
+}
+
+module.exports = {
+    initAuth: app => app.use(router),
+    setAccessToken,
+    getAccessToken
+};
