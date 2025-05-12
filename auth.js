@@ -1,8 +1,9 @@
 const express = require('express');
-const router = express.Router();
 const axios = require('axios');
 const querystring = require('querystring');
 const crypto = require('crypto');
+
+const router = express.Router();
 
 const {
     SPOTIFY_CLIENT_ID,
@@ -11,7 +12,8 @@ const {
     FRONTEND_URI
 } = process.env;
 
-router.get('/auth/spotify', (req, res) => {
+/* ---------- OAuth entry ---------- */
+router.get('/auth/spotify', (_req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
     const p = new URLSearchParams({
         response_type: 'code',
@@ -23,6 +25,7 @@ router.get('/auth/spotify', (req, res) => {
     res.redirect(`https://accounts.spotify.com/authorize?${p}`);
 });
 
+/* ---------- Spotify redirects back ---------- */
 router.get('/auth/spotify/callback', async (req, res) => {
     const {code, state} = req.query;
     const r = await axios.post(
@@ -34,13 +37,13 @@ router.get('/auth/spotify/callback', async (req, res) => {
         }),
         {
             headers: {
-                Authorization:
-                    'Basic ' +
+                Authorization: 'Basic ' +
                     Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
         }
     );
+
     const {access_token, refresh_token, expires_in} = r.data;
     res.redirect(
         `${FRONTEND_URI}/#/callback?access=${access_token}` +
@@ -48,6 +51,7 @@ router.get('/auth/spotify/callback', async (req, res) => {
     );
 });
 
+/* ---------- Refresh ---------- */
 router.post('/auth/refresh', async (req, res) => {
     const {refresh_token} = req.body;
     const r = await axios.post(
@@ -58,8 +62,7 @@ router.post('/auth/refresh', async (req, res) => {
         }),
         {
             headers: {
-                Authorization:
-                    'Basic ' +
+                Authorization: 'Basic ' +
                     Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
@@ -69,6 +72,7 @@ router.post('/auth/refresh', async (req, res) => {
     res.json({access_token, expires_in});
 });
 
+/* ---------- Token-Bridge für cache.js ---------- */
 let currentAccessToken = null;
 
 function setAccessToken(token) {
@@ -79,8 +83,14 @@ function getAccessToken() {
     return currentAccessToken;
 }
 
+/* cache.js ruft das auf, bevor es Spotify anfragt */
+async function ensureAccess() {
+    if (!currentAccessToken) throw new Error('no access token yet');
+}
+
 module.exports = {
     initAuth: app => app.use(router),
     setAccessToken,
-    getAccessToken
+    getAccessToken,
+    ensureAccess
 };
