@@ -183,5 +183,4 @@ module.exports = {
     getReleases,
     getLatest,
     getPlaylistData,
-    getSpotifyUser
 };
