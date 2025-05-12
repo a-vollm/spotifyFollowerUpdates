@@ -28,49 +28,41 @@ router.get('/auth/spotify/callback', (req, res) => {
 
 router.post('/auth/token', async (req, res) => {
     const {code} = req.body;
-    try {
-        const r = await axios.post(
-            'https://accounts.spotify.com/api/token',
-            querystring.stringify({
-                grant_type: 'authorization_code',
-                code,
-                redirect_uri: BACKEND_URI
-            }),
-            {
-                headers: {
-                    Authorization: 'Basic ' + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64'),
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
+    const r = await axios.post(
+        'https://accounts.spotify.com/api/token',
+        querystring.stringify({
+            grant_type: 'authorization_code',
+            code,
+            redirect_uri: BACKEND_URI
+        }),
+        {
+            headers: {
+                Authorization: 'Basic ' + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64'),
+                'Content-Type': 'application/x-www-form-urlencoded'
             }
-        );
-        const {access_token, refresh_token, expires_in} = r.data;
-        res.json({access_token, refresh_token, expires_in});
-    } catch (e) {
-        res.status(400).json({error: 'token_exchange_failed'});
-    }
+        }
+    );
+    const {access_token, refresh_token, expires_in} = r.data;
+    res.json({access_token, refresh_token, expires_in});
 });
 
 router.post('/auth/refresh', async (req, res) => {
     const {refresh_token} = req.body;
-    try {
-        const r = await axios.post(
-            'https://accounts.spotify.com/api/token',
-            querystring.stringify({
-                grant_type: 'refresh_token',
-                refresh_token
-            }),
-            {
-                headers: {
-                    Authorization: 'Basic ' + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64'),
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
+    const r = await axios.post(
+        'https://accounts.spotify.com/api/token',
+        querystring.stringify({
+            grant_type: 'refresh_token',
+            refresh_token
+        }),
+        {
+            headers: {
+                Authorization: 'Basic ' + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64'),
+                'Content-Type': 'application/x-www-form-urlencoded'
             }
-        );
-        const {access_token, expires_in} = r.data;
-        res.json({access_token, expires_in});
-    } catch (e) {
-        res.status(400).json({error: 'refresh_failed'});
-    }
+        }
+    );
+    const {access_token, expires_in} = r.data;
+    res.json({access_token, expires_in});
 });
 
 module.exports = {initAuth: app => app.use(router)};
