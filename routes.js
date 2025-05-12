@@ -50,6 +50,7 @@ router.get('/playlist/:id', ensureAuth, async (req, res) => {
 
 router.post('/subscribe', (req, res) => {
     if (!subscriptions.find(s => JSON.stringify(s) === JSON.stringify(req.body))) subscriptions.push(req.body);
+    console.log("Subscriptions:", req);
     res.status(201).json({success: true});
 });
 
