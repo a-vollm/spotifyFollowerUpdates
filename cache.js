@@ -79,7 +79,6 @@ function getReleases(y) {
 function getLatest() {
     return cachedLatest;
 }
-
 /* -------- Playlist komplett laden + User-Namen auflösen -------- */
 async function getPlaylistData(playlistId) {
     const urlBase = `${SPOTIFY_API_BASE}/playlists/${playlistId}`;
