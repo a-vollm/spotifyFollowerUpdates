@@ -22,13 +22,26 @@ webpush.setVapidDetails(
     process.env.VAPID_PRIVATE
 );
 
-// CORS & JSON
+// index.js  – CORS-Middleware
+const allowed = [
+    process.env.FRONTEND_URI                         // https://spotifyfollowerupdatesfrontend.onrender.com
+
+];
+
 app.use(cors({
-    origin: process.env.FRONTEND_URI,
+    origin(origin, cb) {
+        // Wenn kein Origin (z. B. Postman) → allow
+        if (!origin) return cb(null, true);
+        // exakte Übereinstimmung
+        if (allowed.includes(origin)) return cb(null, true);
+        return cb(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
+    credentials: true,
+    optionsSuccessStatus: 204
 }));
+
 app.use(express.json());
 
 // Auth-Endpoints
