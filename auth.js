@@ -24,36 +24,40 @@ router.get('/auth/spotify', (req, res) => {
 });
 
 router.get('/auth/spotify/callback', async (req, res) => {
-    const {code, state, error} = req.query;
+    const {code, error} = req.query;
 
     if (error) {
         return res.redirect(`${FRONTEND_URI}/?error=${encodeURIComponent(error)}`);
     }
+
+    if (!code) {
+        return res.redirect(`${FRONTEND_URI}/?error=missing_code`);
+    }
+
     try {
-        const r = await axios.post(
+        const response = await axios.post(
             'https://accounts.spotify.com/api/token',
             querystring.stringify({
                 grant_type: 'authorization_code',
                 code,
                 redirect_uri: REDIRECT_URI
             }),
-            {/* headers wie vorhanden */}
+            {
+                headers: {
+                    Authorization: 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
         );
 
-        const {access_token, refresh_token, expires_in} = r.data;
-        res.redirect(
-            `${FRONTEND_URI}/callback?` +
-            new URLSearchParams({
-                access: access_token,
-                refresh: refresh_token,
-                exp: expires_in,
-                state // sollte eigentlich validiert werden
-            })
-        );
+        const {access_token, refresh_token, expires_in} = response.data;
+        res.redirect(`${FRONTEND_URI}/callback?access=${access_token}&refresh=${refresh_token}&exp=${expires_in}`);
     } catch (err) {
+        console.error('Token exchange error:', err.response?.data || err.message);
         res.redirect(`${FRONTEND_URI}/?error=token_exchange_failed`);
     }
 });
+
 
 router.post('/auth/token', async (req, res) => {
     const {code} = req.body;
