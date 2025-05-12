@@ -3,21 +3,27 @@ const {
     getCacheStatus,
     getReleases,
     getLatest,
-    getPlaylistData
+    getPlaylistData, rebuild
 } = require('./cache');
 const {setAccessToken} = require('./auth');
 
 const router = express.Router();
 const subscriptions = [];
+let cacheTriggeredOnce = false;
 
-/* Middleware: prüft Bearer-Header und legt ihn global ab */
 const ensureAuth = (req, res, next) => {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) return res.sendStatus(401);
+
     setAccessToken(auth.split(' ')[1]);
+
+    /* Trigger Rebuild genau einmal nach erfolgreichem Login */
+    if (!cacheTriggeredOnce) {
+        cacheTriggeredOnce = true;
+        rebuild().then(() => console.log('✅ Cache rebuilt after login'));
+    }
     next();
 };
-
 /* ---------- API ---------- */
 router.get('/cache-status', ensureAuth, (_req, res) => {
     res.json(getCacheStatus());
