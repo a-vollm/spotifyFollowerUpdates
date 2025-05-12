@@ -1,11 +1,15 @@
-// auth.js  (ohne Kommentare)
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const querystring = require('querystring');
 const crypto = require('crypto');
 
-const {SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, REDIRECT_URI, FRONTEND_URI} = process.env;
+const {
+    SPOTIFY_CLIENT_ID,
+    SPOTIFY_CLIENT_SECRET,
+    REDIRECT_URI,
+    FRONTEND_URI
+} = process.env;
 
 router.get('/auth/spotify', (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
@@ -30,19 +34,19 @@ router.get('/auth/spotify/callback', async (req, res) => {
         }),
         {
             headers: {
-                Authorization: 'Basic ' + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64'),
+                Authorization:
+                    'Basic ' +
+                    Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
         }
     );
-
     const {access_token, refresh_token, expires_in} = r.data;
     res.redirect(
         `${FRONTEND_URI}/callback?access=${access_token}` +
         `&refresh=${refresh_token}&exp=${expires_in}&state=${state}`
     );
 });
-
 
 router.post('/auth/token', async (req, res) => {
     const {code} = req.body;
@@ -55,7 +59,9 @@ router.post('/auth/token', async (req, res) => {
         }),
         {
             headers: {
-                Authorization: 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
+                Authorization:
+                    'Basic ' +
+                    Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
         }
@@ -74,7 +80,9 @@ router.post('/auth/refresh', async (req, res) => {
         }),
         {
             headers: {
-                Authorization: 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
+                Authorization:
+                    'Basic ' +
+                    Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
         }
