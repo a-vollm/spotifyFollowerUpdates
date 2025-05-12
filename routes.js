@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {ensureAuth} = require('./auth');
-const {getCacheStatus, getLatest, getPlaylistData, getReleasesByYear} = require('./cache');
+const {getCacheStatus, getLatest, getPlaylistData, getReleases} = require('./cache');
 
 // Cache-Status
 router.get('/cache-status', ensureAuth, (req, res) => {
@@ -30,7 +30,7 @@ router.get('/playlist/:id', ensureAuth, async (req, res) => {
 router.get('/releases/:year', ensureAuth, async (req, res) => {
     try {
         const year = req.params.year;
-        const data = await getReleasesByYear(year);
+        const data = await getReleases(year);
         res.json(data);
     } catch (err) {
         res.status(500).json({error: 'fetch_releases_failed'});
