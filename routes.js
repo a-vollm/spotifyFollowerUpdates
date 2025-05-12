@@ -1,6 +1,6 @@
 const express = require('express');
 const {startRebuild, getCacheStatus, getReleases, getLatest, getPlaylistData} = require('./cache');
-const {setAccessToken} = require('./auth');
+const {setAccessToken, store} = require('./auth');
 
 const router = express.Router();
 const subscriptions = [];
@@ -50,7 +50,6 @@ router.get('/playlist/:id', ensureAuth, async (req, res) => {
 
 router.post('/subscribe', (req, res) => {
     if (!subscriptions.find(s => JSON.stringify(s) === JSON.stringify(req.body))) subscriptions.push(req.body);
-    console.log("Subscriptions:", req);
     res.status(201).json({success: true});
 });
 

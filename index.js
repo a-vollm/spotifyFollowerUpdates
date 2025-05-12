@@ -4,6 +4,7 @@ const cors = require('cors');
 const http = require('http');
 const cron = require('node-cron');
 const webpush = require('web-push');
+require('./tokenCron');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,6 +13,7 @@ const cache = require('./cache');
 const {initAuth} = require('./auth');
 const {router: apiRouter, subscriptions} = require('./routes');
 const io = require('./socket').init(server);
+require('./tokenCron');
 
 // VAPID
 webpush.setVapidDetails(
