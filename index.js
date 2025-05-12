@@ -51,6 +51,27 @@ cron.schedule('0 * * * *', async () => {
     }
 });
 
+// Cron: Push jede Minute senden
+cron.schedule('* * * * *', async () => {
+    if (!subscriptions.length) return;
+
+    const payload = JSON.stringify({
+        title: 'Automatischer Push',
+        body: 'Dies ist eine Benachrichtigung jede Minute 🕐',
+        icon: '/assets/icons/icon-192x192.png',
+        badge: '/assets/icons/badge.png'
+    });
+
+    for (const sub of subscriptions) {
+        try {
+            await webpush.sendNotification(sub, payload);
+            console.log('✅ Push gesendet');
+        } catch (err) {
+            console.error('❌ Push-Fehler:', err);
+        }
+    }
+});
+
 // Server start
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
