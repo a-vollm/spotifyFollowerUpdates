@@ -58,29 +58,6 @@ router.get('/auth/spotify/callback', async (req, res) => {
     }
 });
 
-
-router.post('/auth/token', async (req, res) => {
-    const {code} = req.body;
-    const r = await axios.post(
-        'https://accounts.spotify.com/api/token',
-        querystring.stringify({
-            grant_type: 'authorization_code',
-            code,
-            redirect_uri: REDIRECT_URI
-        }),
-        {
-            headers: {
-                Authorization:
-                    'Basic ' +
-                    Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        }
-    );
-    const {access_token, refresh_token, expires_in} = r.data;
-    res.json({access_token, refresh_token, expires_in});
-});
-
 router.post('/auth/refresh', async (req, res) => {
     const {refresh_token} = req.body;
     const r = await axios.post(
