@@ -5,13 +5,22 @@ const {setAccessToken} = require('./auth');
 const router = express.Router();
 const subscriptions = [];
 
+let hasRebuiltOnce = false;
+
 const ensureAuth = (req, res, next) => {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) return res.sendStatus(401);
+
     setAccessToken(auth.split(' ')[1]);
-    startRebuild();
+
+    if (!hasRebuiltOnce) {
+        hasRebuiltOnce = true;
+        startRebuild();
+    }
+
     next();
 };
+
 
 router.get('/cache-status', ensureAuth, (_req, res) => {
     res.json(getCacheStatus());
