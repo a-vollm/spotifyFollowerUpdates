@@ -52,22 +52,22 @@ cron.schedule('0 * * * *', async () => {
 });
 
 // Cron: Push jede Minute senden
-cron.schedule('* * * * *', async () => {
-    if (!subscriptions.length) return;
-
-    const payload = JSON.stringify({
-        notification: {                     // <<-- neu, wichtig für iOS
-            title: 'Automatischer Push',
-            body: 'Dies ist eine Benachrichtigung jede Minute 🕐',
-            icon: '/assets/icons/icon-192x192.png',
-            badge: '/assets/icons/badge.png'
-        }
-    });
-
-    for (const sub of subscriptions) {
-        await webpush.sendNotification(sub, payload);
-    }
-});
+// cron.schedule('* * * * *', async () => {
+//     if (!subscriptions.length) return;
+//
+//     const payload = JSON.stringify({
+//         notification: {                     // <<-- neu, wichtig für iOS
+//             title: 'Automatischer Push',
+//             body: 'Dies ist eine Benachrichtigung jede Minute 🕐',
+//             icon: '/assets/icons/icon-192x192.png',
+//             badge: '/assets/icons/badge.png'
+//         }
+//     });
+//
+//     for (const sub of subscriptions) {
+//         await webpush.sendNotification(sub, payload);
+//     }
+// });
 
 
 // Server start
