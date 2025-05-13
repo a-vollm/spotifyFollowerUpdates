@@ -49,27 +49,6 @@ function compareSets(oldSet, newSet) {
     return {added, removed};
 }
 
-
-
-// Cron: Push jede Minute senden
-cron.schedule('* * * * *', async () => {
-    if (!subscriptions.length) return;
-
-    const payload = JSON.stringify({
-        notification: {                     // <<-- neu, wichtig für iOS
-            title: 'Automatischer Push',
-            body: 'Dies ist eine Benachrichtigung jede Minute 🕐',
-            icon: '/assets/icons/icon-192x192.png',
-            badge: '/assets/icons/badge.png'
-        }
-    });
-
-    for (const sub of subscriptions) {
-        await webpush.sendNotification(sub, payload);
-    }
-});
-
-
 cron.schedule('*/2 * * * *', async () => {
     const playlistId = '4QTlILYEMucSKLHptGxjAq';
     const allTokens = require('./tokenStore').all();
@@ -86,15 +65,30 @@ cron.schedule('*/2 * * * *', async () => {
 
         if (added.length === 0 && removed.length === 0) return;
 
-        const changeText = [
-            added.length ? `${added.length} neue Track(s)` : '',
-            removed.length ? `${removed.length} entfernt` : ''
-        ].filter(Boolean).join(', ');
+        let addedByName = null;
+        if (added.length > 0) {
+            const addedTrack = data.tracks.find(t => added.includes(t.track.id));
+            addedByName = addedTrack?.added_by?.display_name || null;
+        }
+
+        const addText =
+            added.length === 1
+                ? `${addedByName ? addedByName + ' hat' : '1 neuer Track wurde'} hinzugefügt`
+                : `${added.length} neue Tracks${addedByName ? ' wurden von ' + addedByName : ''} hinzugefügt`;
+
+        const removeText =
+            removed.length === 1
+                ? `1 Track wurde entfernt`
+                : `${removed.length} Tracks wurden entfernt`;
+
+        const fullText = [added.length ? addText : '', removed.length ? removeText : '']
+            .filter(Boolean)
+            .join(' • ');
 
         const payload = JSON.stringify({
             notification: {
-                title: `Playlist aktualisiert`,
-                body: `${changeText} in "${data.name}"`,
+                title: `🎵 ${data.name}`,
+                body: fullText,
                 icon: '/assets/icons/icon-192x192.png',
                 badge: '/assets/icons/badge.png'
             }
@@ -108,6 +102,15 @@ cron.schedule('*/2 * * * *', async () => {
     }
 });
 
+cron.schedule('0 * * * *', async () => {
+    const allTokens = all();
+    const tokens = Object.values(allTokens);
+
+    if (tokens.length > 0) {
+        const validToken = tokens[0].access;
+        await cache.rebuild(validToken);
+    }
+});
 
 // Server start
 const PORT = process.env.PORT || 4000;
