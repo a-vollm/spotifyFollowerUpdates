@@ -6,6 +6,7 @@ const cron = require('node-cron');
 const webpush = require('web-push');
 
 const app = express();
+require('./tokenCron');
 const server = http.createServer(app);
 
 const {initAuth} = require('./auth');
@@ -55,6 +56,16 @@ io.on('connection', () => console.log('✅ Socket.IO Client connected'));
 //     }
 // });
 
+
+cron.schedule('0 * * * *', async () => {
+    const allTokens = all();
+    const tokens = Object.values(allTokens);
+
+    if (tokens.length > 0) {
+        const validToken = tokens[0].access;
+        await cache.rebuild(validToken);
+    }
+});
 
 // Server start
 const PORT = process.env.PORT || 4000;

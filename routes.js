@@ -17,7 +17,13 @@ const ensureAuth = (req, res, next) => {
     next();
 };
 
-router.get('/cache-status', ensureAuth, (_req, res) => {
+let initialCacheLoaded = false;
+
+router.get('/cache-status', ensureAuth, async (req, res) => {
+    if (!initialCacheLoaded) {
+        initialCacheLoaded = true;
+        await cache.rebuild(req.token);
+    }
     res.json(cache.getCacheStatus());
 });
 
