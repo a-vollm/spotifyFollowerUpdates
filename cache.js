@@ -26,6 +26,8 @@ async function rebuild(token) {
             });
             allArtists.push(...res.data.artists.items);
             url = res.data.artists.next;
+
+            cache.status.totalArtists = allArtists.length;
         }
 
         const ids = allArtists.map(a => a.id);
