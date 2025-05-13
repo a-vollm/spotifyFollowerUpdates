@@ -3,7 +3,7 @@ const cache = require('./cache');
 const {store} = require('./auth');
 
 const router = express.Router();
-
+const subscriptions = [];
 const ensureAuth = (req, res, next) => {
     const uid = req.headers['x-user-id'];
     if (!uid) return res.sendStatus(401);
@@ -47,4 +47,15 @@ router.get('/playlist/:id', ensureAuth, async (req, res) => {
     }
 });
 
-module.exports = {router};
+router.post('/subscribe', (req, res) => {
+    try {
+        if (!subscriptions.find(s => JSON.stringify(s) === JSON.stringify(req.body))) subscriptions.push(req.body);
+        res.status(201).json({success: true});
+    } catch (err) {
+        console.error('Subscription Error:', err.message);
+        res.status(500).json({error: err.message});
+    }
+});
+
+
+module.exports = {router, subscriptions};

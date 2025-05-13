@@ -69,11 +69,45 @@ async function rebuild(token) {
     }
 }
 
+/* -------- Playlist komplett laden + User-Namen auflösen -------- */
 async function getPlaylistData(playlistId, token) {
-    const res = await api.get(`${SPOTIFY_API}/playlists/${playlistId}`, {
+    const urlBase = `${SPOTIFY_API_BASE}/playlists/${playlistId}`;
+
+    /* Metadaten der Playlist */
+    const playlist = (await axios.get(urlBase, {
         headers: {Authorization: `Bearer ${token}`}
+    })).data;
+
+    /* Alle Tracks (paging 100er-Blöcke) */
+    let tracks = [];
+    let next = `${urlBase}/tracks?limit=100&offset=0`;
+    while (next) {
+        const r = await axios.get(next, {
+            headers: {Authorization: `Bearer ${token}`}
+        });
+        tracks.push(...r.data.items);
+        next = r.data.next;
+    }
+
+    /* Display-Namen der »added_by«-User auflösen (einmal pro ID) */
+    const ids = [...new Set(tracks.map(t => t.added_by?.id).filter(Boolean))];
+    const displayMap = {};
+    for (const id of ids) {
+        try {
+            const u = await axios.get(`${SPOTIFY_API_BASE}/users/${id}`, {
+                headers: {Authorization: `Bearer ${getAccessToken()}`}
+            });
+            displayMap[id] = u.data.display_name;
+        } catch {
+            displayMap[id] = null;
+        }
+    }
+    tracks.forEach(t => {
+        const id = t.added_by?.id;
+        if (id && displayMap[id]) t.added_by.display_name = displayMap[id];
     });
-    return res.data;
+
+    return {...playlist, tracks};
 }
 
 function getCacheStatus() {
