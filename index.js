@@ -13,6 +13,7 @@ const {initAuth} = require('./auth');
 const {router: apiRouter, subscriptions} = require('./routes');
 const io = require('./socket').init(server);
 const lastPlaylists = new Map();
+const lastReleases = new Set();
 
 // VAPID
 webpush.setVapidDetails(
@@ -111,12 +112,55 @@ cron.schedule('* * * * *', async () => {
 });
 
 cron.schedule('0 * * * *', async () => {
-    const allTokens = all();
+    const allTokens = require('./tokenStore').all();
     const tokens = Object.values(allTokens);
 
-    if (tokens.length > 0) {
-        const validToken = tokens[0].access;
-        await cache.rebuild(validToken);
+    if (!tokens.length) return;
+
+    const token = tokens[0].access;
+    const cache = require('./cache');
+
+    const oldSet = new Set(lastReleases);
+    const before = [...oldSet];
+
+    await cache.rebuild(token);
+
+    const current = cache.getLatest(); // Annahme: Array von Release-Objekten
+    const newSet = new Set(current.map(r => r.id));
+
+    const added = [...newSet].filter(x => !oldSet.has(x));
+    lastReleases.clear();
+    current.forEach(r => lastReleases.add(r.id));
+
+    if (!added.length) return;
+
+    // Analyse Alben/Singles
+    const addedItems = current.filter(r => added.includes(r.id));
+    const albums = addedItems.filter(r => r.album_type === 'album').length;
+    const singles = addedItems.filter(r => r.album_type === 'single').length;
+
+    const summary = [
+        albums ? `${albums} neue Alben` : '',
+        singles ? `${singles} neue Singles` : ''
+    ].filter(Boolean).join(' und ');
+
+    const payload = JSON.stringify({
+        notification: {
+            title: '🎉 Neue Releases entdeckt',
+            body: summary,
+            icon: '/assets/icons/icon-192x192.png',
+            badge: '/assets/icons/badge.png',
+            tag: 'releases-update',
+            renotify: true,
+            requireInteraction: true,
+            data: {
+                origin: 'release-monitor'
+            }
+        }
+    });
+
+    for (const sub of subscriptions) {
+        await webpush.sendNotification(sub, payload);
     }
 });
 
