@@ -17,11 +17,18 @@ async function rebuild(token) {
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
     try {
-        const first = await api.get(
-            `${SPOTIFY_API}/me/following?type=artist&limit=${MAX_FIRST_ARTISTS}`,
-            {headers: {Authorization: `Bearer ${token}`}}
-        );
-        const ids = first.data.artists.items.map(a => a.id);
+        const allArtists = [];
+        let url = `${SPOTIFY_API}/me/following?type=artist&limit=50`;
+
+        while (url) {
+            const res = await api.get(url, {
+                headers: {Authorization: `Bearer ${token}`}
+            });
+            allArtists.push(...res.data.artists.items);
+            url = res.data.artists.next;
+        }
+
+        const ids = allArtists.map(a => a.id);
         cache.status.totalArtists = ids.length;
 
         const allAlbums = [];
