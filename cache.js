@@ -71,7 +71,7 @@ async function rebuild(token) {
 
 /* -------- Playlist komplett laden + User-Namen auflösen -------- */
 async function getPlaylistData(playlistId, token) {
-    const urlBase = `${SPOTIFY_API_BASE}/playlists/${playlistId}`;
+    const urlBase = `${SPOTIFY_API}/playlists/${playlistId}`;
 
     /* Metadaten der Playlist */
     const playlist = (await axios.get(urlBase, {
