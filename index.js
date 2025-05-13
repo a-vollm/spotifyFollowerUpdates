@@ -71,10 +71,10 @@ cron.schedule('* * * * *', async () => {
             addedByName = addedTrack?.added_by?.display_name || null;
         }
 
-        const addText =
-            added.length === 1
-                ? `${addedByName ? addedByName + ' hat' : '1 neuer Track wurde'} hinzugefügt`
-                : `${added.length} neue Tracks${addedByName ? ' wurden von ' + addedByName : ''} hinzugefügt`;
+        const addText = added.length === 1
+            ? `${addedByName} hat 1 neuen Track hinzugefügt`
+            : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`;
+
 
         const removeText =
             removed.length === 1
