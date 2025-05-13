@@ -26,7 +26,7 @@ webpush.setVapidDetails(
 app.use(cors({
     origin: process.env.FRONTEND_URI,
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'],
     credentials: true
 }));
 app.use(express.json());

@@ -112,9 +112,5 @@ function ensureAccess() {
 
 module.exports = {
     initAuth: app => app.use(router),
-    /* Export für cache.js und routes.js */
     store: tokenStore,
-    setCurrentAccess,
-    getAccessToken,
-    ensureAccess
 };

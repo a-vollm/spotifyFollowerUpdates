@@ -36,6 +36,10 @@ router.get('/releases/:year', ensureAuth, (req, res) => {
 });
 
 router.get('/playlist/:id', ensureAuth, async (req, res) => {
+    const uid = req.headers['x-user-id'];
+    const tokenData = store.get(uid);
+
+    if (!tokenData) return res.status(401).json({error: 'no_token_available'});
     try {
         const data = await cache.getPlaylistData(req.params.id);
         res.json(data);
