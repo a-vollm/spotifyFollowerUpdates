@@ -94,8 +94,8 @@ async function getPlaylistData(playlistId, token) {
     const displayMap = {};
     for (const id of ids) {
         try {
-            const u = await axios.get(`${SPOTIFY_API_BASE}/users/${id}`, {
-                headers: {Authorization: `Bearer ${getAccessToken()}`}
+            const u = await axios.get(`${SPOTIFY_API}/users/${id}`, {
+                headers: {Authorization: `Bearer ${token}`}
             });
             displayMap[id] = u.data.display_name;
         } catch {
