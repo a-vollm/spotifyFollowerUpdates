@@ -12,6 +12,7 @@ const server = http.createServer(app);
 const {initAuth} = require('./auth');
 const {router: apiRouter, subscriptions} = require('./routes');
 const io = require('./socket').init(server);
+const lastPlaylists = new Map();
 
 // VAPID
 webpush.setVapidDetails(
@@ -38,6 +39,18 @@ app.use(apiRouter);
 // Socket.IO
 io.on('connection', () => console.log('✅ Socket.IO Client connected'));
 
+function getTrackIds(playlist) {
+    return new Set(playlist.tracks.map(t => t.track.id));
+}
+
+function compareSets(oldSet, newSet) {
+    const added = [...newSet].filter(x => !oldSet.has(x));
+    const removed = [...oldSet].filter(x => !newSet.has(x));
+    return {added, removed};
+}
+
+
+
 // Cron: Push jede Minute senden
 cron.schedule('* * * * *', async () => {
     if (!subscriptions.length) return;
@@ -57,15 +70,44 @@ cron.schedule('* * * * *', async () => {
 });
 
 
-cron.schedule('0 * * * *', async () => {
-    const allTokens = all();
-    const tokens = Object.values(allTokens);
+cron.schedule('*/2 * * * *', async () => {
+    const playlistId = '4QTlILYEMucSKLHptGxjAq';
+    const allTokens = require('./tokenStore').all();
+    const token = Object.values(allTokens)[0]?.access;
+    if (!token) return;
 
-    if (tokens.length > 0) {
-        const validToken = tokens[0].access;
-        await cache.rebuild(validToken);
+    try {
+        const data = await require('./cache').getPlaylistData(playlistId, token);
+        const currentSet = getTrackIds(data);
+        const oldSet = lastPlaylists.get(playlistId) || new Set();
+
+        const {added, removed} = compareSets(oldSet, currentSet);
+        lastPlaylists.set(playlistId, currentSet);
+
+        if (added.length === 0 && removed.length === 0) return;
+
+        const changeText = [
+            added.length ? `${added.length} neue Track(s)` : '',
+            removed.length ? `${removed.length} entfernt` : ''
+        ].filter(Boolean).join(', ');
+
+        const payload = JSON.stringify({
+            notification: {
+                title: `Playlist aktualisiert`,
+                body: `${changeText} in "${data.name}"`,
+                icon: '/assets/icons/icon-192x192.png',
+                badge: '/assets/icons/badge.png'
+            }
+        });
+
+        for (const sub of subscriptions) {
+            await webpush.sendNotification(sub, payload);
+        }
+    } catch (err) {
+        console.error('Fehler bei Playlist-Check:', err.message);
     }
 });
+
 
 // Server start
 const PORT = process.env.PORT || 4000;
