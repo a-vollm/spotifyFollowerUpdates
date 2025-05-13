@@ -1,6 +1,6 @@
 const express = require('express');
 const cache = require('./cache');
-const {store, setCurrentAccess} = require('./auth');
+const {store} = require('./auth');
 
 const router = express.Router();
 
@@ -13,7 +13,7 @@ const ensureAuth = (req, res, next) => {
         return res.sendStatus(401);
     }
 
-    setCurrentAccess(token.access);
+    req.token = token.access;
     next();
 };
 
@@ -22,30 +22,22 @@ router.get('/cache-status', ensureAuth, (_req, res) => {
 });
 
 router.get('/latest', ensureAuth, (_req, res) => {
-    const s = cache.getCacheStatus();
-    if (s.loading) return res.status(202).json(s);
     res.json(cache.getLatest());
 });
 
 router.get('/releases/:year', ensureAuth, (req, res) => {
-    const s = cache.getCacheStatus();
-    if (s.loading) return res.status(202).json(s);
     const data = cache.getReleases(req.params.year);
     if (!data.length) return res.status(404).json({error: 'No data yet'});
     res.json(data);
 });
 
 router.get('/playlist/:id', ensureAuth, async (req, res) => {
-    const uid = req.headers['x-user-id'];
-    const tokenData = store.get(uid);
-
-    if (!tokenData) return res.status(401).json({error: 'no_token_available'});
     try {
-        const data = await cache.getPlaylistData(req.params.id);
+        const data = await cache.getPlaylistData(req.params.id, req.token);
         res.json(data);
     } catch (err) {
-        console.error('Playlist fetch error:', err);
-        res.status(500).json({error: 'fetch_playlist_failed'});
+        console.error('Playlist fetch error:', err.message);
+        res.status(500).json({error: err.message});
     }
 });
 

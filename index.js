@@ -4,16 +4,13 @@ const cors = require('cors');
 const http = require('http');
 const cron = require('node-cron');
 const webpush = require('web-push');
-require('./tokenCron');
 
 const app = express();
 const server = http.createServer(app);
 
-const cache = require('./cache');
 const {initAuth} = require('./auth');
-const {router: apiRouter, subscriptions} = require('./routes');
+const {router: apiRouter} = require('./routes');
 const io = require('./socket').init(server);
-require('./tokenCron');
 
 // VAPID
 webpush.setVapidDetails(
@@ -37,23 +34,8 @@ initAuth(app);
 // API-Routen
 app.use(apiRouter);
 
-const tokensAvailable = Object.keys(require('./tokenStore').all()).length > 0;
-if (tokensAvailable) {
-    cache.rebuild().then(() => io.emit('cacheUpdated')).catch(console.error);
-}
-
 // Socket.IO
 io.on('connection', () => console.log('✅ Socket.IO Client connected'));
-
-// Cron-Jobs (Beispiel: stündliches Rebuild)
-cron.schedule('0 * * * *', async () => {
-    try {
-        await cache.rebuild();
-        io.emit('cacheUpdated');
-    } catch (err) {
-        console.error('Cache rebuild error:', err);
-    }
-});
 
 // Cron: Push jede Minute senden
 // cron.schedule('* * * * *', async () => {
