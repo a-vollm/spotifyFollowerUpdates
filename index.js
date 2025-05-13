@@ -49,7 +49,7 @@ function compareSets(oldSet, newSet) {
     return {added, removed};
 }
 
-cron.schedule('*/2 * * * *', async () => {
+cron.schedule('* * * * *', async () => {
     const playlistId = '4QTlILYEMucSKLHptGxjAq';
     const allTokens = require('./tokenStore').all();
     const token = Object.values(allTokens)[0]?.access;
