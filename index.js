@@ -90,9 +90,17 @@ cron.schedule('* * * * *', async () => {
                 title: `🎵 ${data.name}`,
                 body: fullText,
                 icon: '/assets/icons/icon-192x192.png',
-                badge: '/assets/icons/badge.png'
+                badge: '/assets/icons/badge.png',
+                tag: 'playlist-tracking',
+                renotify: true,
+                silent: false,
+                requireInteraction: true,
+                data: {
+                    origin: 'playlist-monitor'
+                }
             }
         });
+
 
         for (const sub of subscriptions) {
             await webpush.sendNotification(sub, payload);
