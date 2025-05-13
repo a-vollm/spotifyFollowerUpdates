@@ -37,8 +37,10 @@ initAuth(app);
 // API-Routen
 app.use(apiRouter);
 
-// Initialer Cache-Rebuild
-cache.rebuild().then(() => io.emit('cacheUpdated')).catch(console.error);
+const tokensAvailable = Object.keys(require('./tokenStore').all()).length > 0;
+if (tokensAvailable) {
+    cache.rebuild().then(() => io.emit('cacheUpdated')).catch(console.error);
+}
 
 // Socket.IO
 io.on('connection', () => console.log('✅ Socket.IO Client connected'));

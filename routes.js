@@ -1,18 +1,8 @@
-// routes.js
 const express = require('express');
-const {
-    startRebuild,
-    getCacheStatus,
-    getReleases,
-    getLatest,
-    getPlaylistData
-} = require('./cache');
-
+const cache = require('./cache');
 const {store, setCurrentAccess} = require('./auth');
 
 const router = express.Router();
-
-let firstLoginDone = false;
 
 const ensureAuth = (req, res, next) => {
     const uid = req.headers['x-user-id'];
@@ -24,36 +14,30 @@ const ensureAuth = (req, res, next) => {
     }
 
     setCurrentAccess(token.access);
-
-    if (!firstLoginDone) {
-        firstLoginDone = true;
-        startRebuild();
-    }
-
     next();
 };
 
 router.get('/cache-status', ensureAuth, (_req, res) => {
-    res.json(getCacheStatus());
+    res.json(cache.getCacheStatus());
 });
 
 router.get('/latest', ensureAuth, (_req, res) => {
-    const s = getCacheStatus();
+    const s = cache.getCacheStatus();
     if (s.loading) return res.status(202).json(s);
-    res.json(getLatest());
+    res.json(cache.getLatest());
 });
 
 router.get('/releases/:year', ensureAuth, (req, res) => {
-    const s = getCacheStatus();
+    const s = cache.getCacheStatus();
     if (s.loading) return res.status(202).json(s);
-    const data = getReleases(req.params.year);
+    const data = cache.getReleases(req.params.year);
     if (!data.length) return res.status(404).json({error: 'No data yet'});
     res.json(data);
 });
 
 router.get('/playlist/:id', ensureAuth, async (req, res) => {
     try {
-        const data = await getPlaylistData(req.params.id);
+        const data = await cache.getPlaylistData(req.params.id);
         res.json(data);
     } catch (err) {
         console.error('Playlist fetch error:', err);

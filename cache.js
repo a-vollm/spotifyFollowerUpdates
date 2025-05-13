@@ -151,10 +151,19 @@ async function rebuildFull() {
     }
 }
 
+async function getPlaylistData(playlistId) {
+    await ensureAccess();
+    const res = await api.get(`${SPOTIFY_API}/playlists/${playlistId}`, {
+        headers: {Authorization: `Bearer ${getAccessToken()}`}
+    });
+    return res.data;
+}
+
 module.exports = {
     rebuild,
     rebuildFull,
     getCacheStatus,
     getLatest,
-    getReleases
+    getReleases,
+    getPlaylistData
 };

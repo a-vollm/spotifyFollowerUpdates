@@ -56,6 +56,8 @@ router.get('/auth/spotify/callback', async (req, res) => {
         refresh: refresh_token,
         exp: Date.now() / 1000 + expires_in   // Unix-Sekunden
     });
+    /* Access-Token für den aktuellen Benutzer setzen */
+    setCurrentAccess(access_token);
 
     /* Aktuelles Access-Token global verfügbar machen */
     currentAccessToken = access_token;
