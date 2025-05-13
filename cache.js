@@ -3,6 +3,10 @@ const {ensureAccess, getAccessToken} = require('./auth');
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 
+const axiosInstance = axios.create({
+    timeout: 30000
+});
+
 let cacheStatus = {loading: false, totalArtists: 0, doneArtists: 0};
 let cachedByYear = {};
 let cachedLatest = [];
@@ -25,7 +29,7 @@ async function rebuild() {
         const ids = [];
         let nextUrl = `${SPOTIFY_API_BASE}/me/following?type=artist&limit=50`;
         while (nextUrl) {
-            const r = await axios.get(nextUrl, {headers: {Authorization: `Bearer ${getAccessToken()}`}});
+            const r = await axiosInstance.get(nextUrl, {headers: {Authorization: `Bearer ${getAccessToken()}`}});
             ids.push(...r.data.artists.items.map(a => a.id));
             nextUrl = r.data.artists.next;
         }
@@ -34,7 +38,7 @@ async function rebuild() {
         const all = [];
         for (const id of ids) {
             try {
-                const r = await axios.get(`${SPOTIFY_API_BASE}/artists/${id}/albums`, {
+                const r = await axiosInstance.get(`${SPOTIFY_API_BASE}/artists/${id}/albums`, {
                     headers: {Authorization: `Bearer ${getAccessToken()}`},
                     params: {include_groups: 'album,single', limit: 50}
                 });
@@ -79,12 +83,13 @@ function getReleases(y) {
 function getLatest() {
     return cachedLatest;
 }
+
 /* -------- Playlist komplett laden + User-Namen auflösen -------- */
 async function getPlaylistData(playlistId) {
     const urlBase = `${SPOTIFY_API_BASE}/playlists/${playlistId}`;
 
     /* Metadaten der Playlist */
-    const playlist = (await axios.get(urlBase, {
+    const playlist = (await axiosInstance.get(urlBase, {
         headers: {Authorization: `Bearer ${getAccessToken()}`}
     })).data;
 
@@ -92,7 +97,7 @@ async function getPlaylistData(playlistId) {
     let tracks = [];
     let next = `${urlBase}/tracks?limit=100&offset=0`;
     while (next) {
-        const r = await axios.get(next, {
+        const r = await axiosInstance.get(next, {
             headers: {Authorization: `Bearer ${getAccessToken()}`}
         });
         tracks.push(...r.data.items);
@@ -104,7 +109,7 @@ async function getPlaylistData(playlistId) {
     const displayMap = {};
     for (const id of ids) {
         try {
-            const u = await axios.get(`${SPOTIFY_API_BASE}/users/${id}`, {
+            const u = await axiosInstance.get(`${SPOTIFY_API_BASE}/users/${id}`, {
                 headers: {Authorization: `Bearer ${getAccessToken()}`}
             });
             displayMap[id] = u.data.display_name;
@@ -119,6 +124,5 @@ async function getPlaylistData(playlistId) {
 
     return {...playlist, tracks};
 }
-
 
 module.exports = {startRebuild, rebuild, getCacheStatus, getReleases, getLatest, getPlaylistData};
