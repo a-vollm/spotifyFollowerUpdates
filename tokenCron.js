@@ -8,7 +8,7 @@ const {
     SPOTIFY_CLIENT_SECRET
 } = process.env;
 
-cron.schedule('*/45 * * * *', async () => {
+cron.schedule('*/10 * * * *', async () => {
     const now = Date.now() / 1000;
     const allTokens = tokenStore.all();
 

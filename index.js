@@ -125,7 +125,7 @@ cron.schedule('0 * * * *', async () => {
 
     await cache.rebuild(token);
 
-    const current = cache.getLatest(); // Annahme: Array von Release-Objekten
+    const current = cache.getLatest();
     const newSet = new Set(current.map(r => r.id));
 
     const added = [...newSet].filter(x => !oldSet.has(x));

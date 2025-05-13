@@ -9,13 +9,16 @@ const ensureAuth = (req, res, next) => {
     if (!uid) return res.sendStatus(401);
 
     const token = store.get(uid);
-    if (!token || token.exp - Date.now() / 1000 < 60) {
-        return res.sendStatus(401);
+    const now = Date.now() / 1000;
+    if (!token || !token.access || token.exp - now < 60) {
+        console.warn(`⚠️ Token für ${uid} fehlt oder ist abgelaufen`);
+        return res.status(401).json({error: 'token_expired'});
     }
 
     req.token = token.access;
     next();
 };
+
 
 let initialCacheLoaded = false;
 
