@@ -26,21 +26,24 @@ async function rebuild(token) {
             });
             allArtists.push(...res.data.artists.items);
             url = res.data.artists.next;
-
-            cache.status.totalArtists = allArtists.length;
         }
 
         const ids = allArtists.map(a => a.id);
         cache.status.totalArtists = ids.length;
 
         const allAlbums = [];
+
         for (const id of ids) {
             const r = await api.get(`${SPOTIFY_API}/artists/${id}/albums`, {
                 headers: {Authorization: `Bearer ${token}`},
                 params: {include_groups: 'album,single', limit: 50}
             });
+
             allAlbums.push(...r.data.items);
             cache.status.doneArtists++;
+
+            // Optional: künstliches Delay zur Visualisierung im Frontend
+            await new Promise(res => setTimeout(res, 100));
         }
 
         const byYear = {};
@@ -70,6 +73,7 @@ async function rebuild(token) {
         cache.status.loading = false;
     }
 }
+
 
 /* -------- Playlist komplett laden + User-Namen auflösen -------- */
 async function getPlaylistData(playlistId, token) {
