@@ -48,15 +48,15 @@ cron.schedule('*/1 * * * *', async () => {
     const allTokens = await tokenStore.all();
     console.log(`🔑 Gefundene Benutzer: ${Object.keys(allTokens).length}`);
 
+    const pendingCacheUpdates = [];
+
     for (const [uid, token] of Object.entries(allTokens)) {
         try {
             console.log(`\n--- Prüfe UID ${uid} ---`);
 
-            // 1. Playlist-Daten abrufen
             const data = await cache.getPlaylistData(playlistId, token.access);
             console.log(`🎵 Playlist "${data.name}" hat ${data.tracks.length} Tracks`);
 
-            // 2. Track-IDs vergleichen
             const currentSet = getTrackIds(data);
             const oldSet = await tokenStore.getPlaylistCache(`${playlistId}_${uid}`);
             console.log(`🗃️ Alte Tracks: ${oldSet.size}, Aktuelle Tracks: ${currentSet.size}`);
@@ -74,6 +74,7 @@ cron.schedule('*/1 * * * *', async () => {
                 const addedTrack = data.tracks.find(t => added.includes(t.track.id));
                 addedByName = addedTrack?.added_by?.display_name || null;
             }
+
             const parts = [];
 
             if (added.length > 0) {
@@ -105,18 +106,25 @@ cron.schedule('*/1 * * * *', async () => {
                 }
             });
 
-            // 4. Push senden
             console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
             for (const sub of subscriptions) {
                 await webpush.sendNotification(sub, payload);
             }
 
-            // 5. Cache aktualisieren
-            await tokenStore.setPlaylistCache(`${playlistId}_${uid}`, [...currentSet]);
-            console.log('✅ Playlist-Cache aktualisiert.');
+            pendingCacheUpdates.push({uid, cacheKey: `${playlistId}_${uid}`, newSet: [...currentSet]});
+            console.log('🕒 Cache-Aktualisierung vorgemerkt.');
 
         } catch (err) {
             console.error(`❌ Fehler bei UID ${uid}:`, err.message);
+        }
+    }
+
+    for (const {uid, cacheKey, newSet} of pendingCacheUpdates) {
+        try {
+            await tokenStore.setPlaylistCache(cacheKey, newSet);
+            console.log(`✅ Playlist-Cache für ${uid} aktualisiert.`);
+        } catch (err) {
+            console.error(`❌ Fehler beim Cache-Update für ${uid}:`, err.message);
         }
     }
 });
