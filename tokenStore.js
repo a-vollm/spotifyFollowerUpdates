@@ -1,35 +1,23 @@
 const {Pool} = require('pg');
-const dns = require('dns').promises;
+const dns = require('dns');
 
-let pool;
-let poolInitialized = false;
+// Force IPv4 for all DNS lookups
+dns.setDefaultResultOrder('ipv4first');
 
-async function initializePool() {
-    if (poolInitialized) return;
+const pool = new Pool({
+    connectionString: `postgres://postgres:${process.env.DATABASE_PASSWORD}@db.nnojnnqlolbqovvoetfh.supabase.co:5432/postgres`,
+    ssl: {
+        rejectUnauthorized: false,
+        servername: 'db.nnojnnqlolbqovvoetfh.supabase.co'
+    },
+    connectionTimeoutMillis: 10000,
+    // Force IPv4 for TCP connections
+    lookup: (host, options, callback) =>
+        dns.lookup(host, {family: 4}, callback)
+});
 
-    const {address} = await dns.lookup('db.nnojnnqlolbqovvoetfh.supabase.co', {family: 4});
-
-    pool = new Pool({
-        user: 'postgres',
-        password: process.env.DATABASE_PASSWORD,
-        host: address,
-        database: 'postgres',
-        port: 5432,
-        ssl: {
-            rejectUnauthorized: false,
-            servername: 'db.nnojnnqlolbqovvoetfh.supabase.co'
-        },
-        connectionTimeoutMillis: 10000
-    });
-
-    poolInitialized = true;
-    console.log('✅ Pool erfolgreich aufgebaut mit:', address);
-}
-
-
-// CRUD-Funktionen
+// Keep your existing CRUD functions unchanged
 exports.get = async (uid) => {
-    await initializePool();
     const {rows} = await pool.query('SELECT access, refresh, exp FROM tokens WHERE uid=$1', [uid]);
     return rows[0] || null;
 };
