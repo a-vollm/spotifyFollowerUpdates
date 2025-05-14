@@ -1,5 +1,5 @@
 const axios = require('axios');
-
+const tokenStore = require('./tokenStore')
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const AXIOS_TIMEOUT = 25_000;
 
@@ -92,41 +92,8 @@ async function rebuild(uid, token) {
     } catch (err) {
         console.error(`[${uid}] Cache rebuild failed:`, err.message);
         if ([401, 429].includes(err.response?.status)) {
-            const {SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET} = process.env;
-            const qs = require('querystring');
-            const axios = require('axios');
-            const saved = await tokenStore.get(uid);
-            if (saved?.refresh) {
-                try {
-                    const resToken = await axios.post(
-                        'https://accounts.spotify.com/api/token',
-                        qs.stringify({
-                            grant_type: 'refresh_token',
-                            refresh_token: saved.refresh
-                        }),
-                        {
-                            headers: {
-                                Authorization: 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
-                                'Content-Type': 'application/x-www-form-urlencoded'
-                            }
-                        }
-                    );
-                    saved.access = resToken.data.access_token;
-                    saved.exp = Date.now() / 1000 + resToken.data.expires_in;
-                    if (resToken.data.refresh_token) {
-                        saved.refresh = resToken.data.refresh_token;
-                    }
-                    await tokenStore.set(uid, saved);
-                    console.log(`🔁 Token erneuert für ${uid} – erneuter rebuild`);
-                    return await rebuild(uid, saved.access); // 🟢 Neustart mit neuem Token
-                } catch (e) {
-                    console.error(`❌ Refresh fehlgeschlagen für ${uid}:`, e.message);
-                    await tokenStore.delete(uid);
-                }
-            } else {
-                console.warn(`⚠️ Kein Refresh-Token vorhanden für ${uid}`);
-                await tokenStore.delete(uid);
-            }
+            console.log(`♻️ Lösche Token für ${uid}`);
+            await tokenStore.delete(uid);
         }
 
     } finally {
@@ -136,32 +103,82 @@ async function rebuild(uid, token) {
 
 async function getPlaylistData(playlistId, token) {
     const urlBase = `${SPOTIFY_API}/playlists/${playlistId}`;
-    const playlist = (await axios.get(urlBase, {headers: {Authorization: `Bearer ${token}`}})).data;
 
-    let tracks = [];
-    let next = `${urlBase}/tracks?limit=100&offset=0`;
-    while (next) {
-        const r = await axios.get(next, {headers: {Authorization: `Bearer ${token}`}});
-        tracks.push(...r.data.items);
-        next = r.data.next;
+    // 1. Playlist-Grunddaten mit Retry-Logik
+    const playlist = await safeApiCall(urlBase, token);
+
+    // 2. Alle Tracks paginiert abrufen
+    const tracks = await getAllPaginatedData(`${urlBase}/tracks?limit=100`, token);
+
+    // 3. Batch-Weise Benutzerdaten abrufen
+    const displayMap = await getUsersDisplayNames(tracks, token);
+
+    // 4. Display-Namen zuweisen
+    return {
+        ...playlist,
+        tracks: tracks.map(t => ({
+            ...t,
+            added_by: {
+                ...t.added_by,
+                display_name: displayMap[t.added_by?.id] || t.added_by?.display_name
+            }
+        }))
+    };
+}
+
+// Hilfsfunktion für paginierte Daten
+async function getAllPaginatedData(url, token) {
+    let items = [];
+    while (url) {
+        const response = await safeApiCall(url, token);
+        items.push(...response.items);
+        url = response.next;
     }
+    return items;
+}
 
-    const ids = [...new Set(tracks.map(t => t.added_by?.id).filter(Boolean))];
+// Hilfsfunktion für Benutzerdaten
+async function getUsersDisplayNames(tracks, token) {
+    const uniqueUserIds = [...new Set(tracks.map(t => t.added_by?.id).filter(Boolean))];
+
     const displayMap = {};
-    for (const id of ids) {
+    await Promise.all(
+        uniqueUserIds.map(async (userId) => {
+            try {
+                const user = await safeApiCall(
+                    `${SPOTIFY_API}/users/${userId}`,
+                    token
+                );
+                displayMap[userId] = user.display_name;
+            } catch (error) {
+                console.warn(`Fehler bei Benutzer ${userId}:`, error.message);
+                displayMap[userId] = null;
+            }
+        })
+    );
+    return displayMap;
+}
+
+// Generische API-Call-Funktion mit Retry-Logik
+async function safeApiCall(url, token, retries = 3) {
+    for (let i = 0; i < retries; i++) {
         try {
-            const u = await axios.get(`${SPOTIFY_API}/users/${id}`, {headers: {Authorization: `Bearer ${token}`}});
-            displayMap[id] = u.data.display_name;
-        } catch {
-            displayMap[id] = null;
+            const response = await axios.get(url, {
+                headers: {Authorization: `Bearer ${token}`},
+                params: {market: 'from_token'}
+            });
+            return response.data;
+        } catch (error) {
+            if (error.response?.status === 429) {
+                const backoff = Math.pow(2, i) * 1000;
+                console.log(`⏳ Rate Limit - Retry in ${backoff}ms`);
+                await new Promise(r => setTimeout(r, backoff));
+                continue;
+            }
+            throw error;
         }
     }
-    tracks.forEach(t => {
-        const id = t.added_by?.id;
-        if (id && displayMap[id]) t.added_by.display_name = displayMap[id];
-    });
-
-    return {...playlist, tracks};
+    throw new Error(`API request failed after ${retries} retries`);
 }
 
 /* -------- Getter -------- */

@@ -71,7 +71,7 @@ cron.schedule('*/1 * * * *', async () => {
             }
 
             // 3. Benachrichtigung erstellen
-            let addedByName = null;
+            let addedByName = addedTrack?.added_by?.display_name;
             const parts = [];
 
             if (added.length > 0) {
@@ -117,13 +117,8 @@ cron.schedule('*/1 * * * *', async () => {
                 }
             }
 
-            // 5. Cache aktualisieren
-            if (added.length > 0 || removed.length > 0) {
-                await tokenStore.setPlaylistCache(`${playlistId}_${uid}`, [...currentSet]);
-                console.log('✅ Playlist-Cache aktualisiert.');
-            } else {
-                console.log('⏩ Keine Änderungen – Cache bleibt unverändert.');
-            }
+            await tokenStore.setPlaylistCache(`${playlistId}_${uid}`, [...currentSet]);
+            console.log('✅ Playlist-Cache aktualisiert.');
 
         } catch (err) {
             console.error(`❌ Fehler bei UID ${uid}:`, err.message);
@@ -178,7 +173,7 @@ cron.schedule('*/30 * * * *', async () => {
     }
 });
 
-cron.schedule('*/5 * * * *', async () => {
+cron.schedule('*/15 * * * *', async () => {
     const tokens = await tokenStore.all();
     for (const [uid, token] of Object.entries(tokens)) {
         await cache.rebuild(uid, token.access);
