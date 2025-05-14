@@ -57,11 +57,13 @@ const ensureAuth = async (req, res, next) => {
 router.get('/cache-status', ensureAuth, async (req, res) => {
     const st = cache.getCacheStatus(req.uid);
     if (!st.loading && st.totalArtists === 0) {
-        cache.rebuild(req.uid, req.token)
-            .catch(err => console.error(err));
+        st.loading = true;
+        cache.rebuild(req.uid, req.token).catch(err => console.error(err));
     }
+
     res.json(st);
 });
+
 
 router.get('/latest', ensureAuth, (req, res) => {
     res.json(cache.getLatest(req.uid));
@@ -69,7 +71,6 @@ router.get('/latest', ensureAuth, (req, res) => {
 
 router.get('/releases/:year', ensureAuth, (req, res) => {
     const data = cache.getReleases(req.uid, req.params.year);
-    if (!data.length) return res.status(404).json({error: 'No data yet'});
     res.json(data);
 });
 
