@@ -1,5 +1,5 @@
 const axios = require('axios');
-const tokenStore = require('./tokenStore');
+
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const AXIOS_TIMEOUT = 25_000;
 
@@ -23,7 +23,6 @@ async function rebuild(uid, token) {
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
     try {
-        /* ---------- Gefolgte Artists holen ---------- */
         const allArtists = [];
         let url = `${SPOTIFY_API}/me/following?type=artist&limit=50`;
 
@@ -35,38 +34,35 @@ async function rebuild(uid, token) {
 
         cache.status.totalArtists = allArtists.length;
 
-        /* ---------- EARLY-EXIT: Nutzer folgt niemandem ---------- */
         if (allArtists.length === 0) {
             cache.latest = [];
             cache.releases = {};
             cache.status.loading = false;
-            return;                                // sofort abbrechen
+            return;
         }
 
-        /* ---------- Releases holen ---------- */
         const allAlbums = [];
         for (const artist of allArtists) {
-            const r = await api.get(
-                `${SPOTIFY_API}/artists/${artist.id}/albums`,
-                {
+            try {
+                const r = await api.get(`${SPOTIFY_API}/artists/${artist.id}/albums`, {
                     headers: {Authorization: `Bearer ${token}`},
                     params: {include_groups: 'album,single', limit: 50}
-                }
-            );
-            allAlbums.push(...r.data.items);
+                });
+                allAlbums.push(...r.data.items);
+            } catch (err) {
+                console.warn(`[${uid}] Fehler beim Abrufen der Releases für Artist ${artist.id}: ${err.message}`);
+            }
             cache.status.doneArtists++;
-            await new Promise(res => setTimeout(res, 100));      // nur für UI-Progress
+            await new Promise(res => setTimeout(res, 100));
         }
 
-        /* ---------- EARLY-EXIT: keine Releases gefunden ---------- */
         if (allAlbums.length === 0) {
             cache.latest = [];
             cache.releases = {};
             cache.status.loading = false;
-            return;                                // sofort abbrechen
+            return;
         }
 
-        /* ---------- Gruppieren nach Jahr/Monat ---------- */
         const byYear = {};
         allAlbums.forEach(a => {
             const d = new Date(a.release_date);
@@ -91,44 +87,6 @@ async function rebuild(uid, token) {
 
     } catch (err) {
         console.error(`[${uid}] Cache rebuild failed:`, err.message);
-        if (err.response?.status === 401) {
-            const {SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET} = process.env;
-            const qs = require('querystring');
-            const axios = require('axios');
-            const saved = await tokenStore.get(uid);
-            if (saved?.refresh) {
-                try {
-                    const resToken = await axios.post(
-                        'https://accounts.spotify.com/api/token',
-                        qs.stringify({
-                            grant_type: 'refresh_token',
-                            refresh_token: saved.refresh
-                        }),
-                        {
-                            headers: {
-                                Authorization: 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
-                                'Content-Type': 'application/x-www-form-urlencoded'
-                            }
-                        }
-                    );
-                    saved.access = resToken.data.access_token;
-                    saved.exp = Date.now() / 1000 + resToken.data.expires_in;
-                    if (resToken.data.refresh_token) {
-                        saved.refresh = resToken.data.refresh_token;
-                    }
-                    await tokenStore.set(uid, saved);
-                    console.log(`🔁 Token erneuert für ${uid} – erneuter rebuild`);
-                    return await rebuild(uid, saved.access); // 🟢 Neustart mit neuem Token
-                } catch (e) {
-                    console.error(`❌ Refresh fehlgeschlagen für ${uid}:`, e.message);
-                    await tokenStore.delete(uid);
-                }
-            } else {
-                console.warn(`⚠️ Kein Refresh-Token vorhanden für ${uid}`);
-                await tokenStore.delete(uid);
-            }
-        }
-
     } finally {
         cache.status.loading = false;
     }
@@ -164,12 +122,10 @@ async function getPlaylistData(playlistId, token) {
     return {...playlist, tracks};
 }
 
-/* -------- Getter -------- */
 const getCacheStatus = uid => getCache(uid).status;
 const getLatest = uid => getCache(uid).latest;
 const getReleases = (uid, y) => getCache(uid).releases[y] || [];
 
-/* -------- Exporte -------- */
 module.exports = {
     rebuild,
     getCacheStatus,
