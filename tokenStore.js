@@ -1,8 +1,8 @@
 const {Pool} = require('pg');
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,     // ← nur noch die URI
-    ssl: {rejectUnauthorized: false},              // Render verlangt das
+    connectionString: process.env.DATABASE_URL,
+    ssl: {rejectUnauthorized: false},
     connectionTimeoutMillis: 10_000
 });
 
@@ -16,17 +16,18 @@ exports.get = async uid => {
 };
 
 exports.set = async (uid, t) => {
-    await pool.query(
-        `INSERT INTO tokens (uid, access, refresh, exp)
-         VALUES ($1, $2, $3, $4) ON CONFLICT (uid) DO
+    const exp = Math.floor(t.exp); // PostgreSQL erwartet BIGINT
+    await pool.query(`
+        INSERT INTO tokens (uid, access, refresh, exp)
+        VALUES ($1, $2, $3, $4) ON CONFLICT (uid) DO
         UPDATE
             SET access = EXCLUDED.access,
             refresh = EXCLUDED.refresh,
             exp = EXCLUDED.exp,
-            updated_at = CURRENT_TIMESTAMP`,
-        [uid, t.access, t.refresh, t.exp]
-    );
+            updated_at = CURRENT_TIMESTAMP
+    `, [uid, t.access, t.refresh, exp]);
 };
+
 
 exports.delete = uid =>
     pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
