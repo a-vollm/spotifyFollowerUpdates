@@ -69,16 +69,15 @@ cron.schedule('*/1 * * * *', async () => {
                 continue;
             }
 
-            // 3. Benachrichtigung erstellen
-            let addedByName = addedTrack?.added_by?.display_name;
-            const parts = [];
-
+            let addedByName = null;
             if (added.length > 0) {
-                const addedText = added.length === 1
-                    ? `${addedByName} hat 1 neuen Track hinzugefügt`
-                    : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`;
-                parts.push(addedText);
+                const addedTrack = data.tracks.find(t => added.includes(t.track.id));
+                addedByName = addedTrack?.added_by?.display_name || null;
             }
+
+            const addText = added.length === 1
+                ? `${addedByName} hat 1 neuen Track hinzugefügt`
+                : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`;
 
             if (removed.length > 0) {
                 const removedText = removed.length === 1
