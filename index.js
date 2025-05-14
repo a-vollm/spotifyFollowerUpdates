@@ -109,8 +109,9 @@ cron.schedule('*/1 * * * *', async () => {
             });
 
             console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
-            for (const sub of subscriptions) {
-                await webpush.sendNotification(sub, payload);
+            const userSubscriptions = subscriptions.filter(s => s.uid === uid);
+            for (const sub of userSubscriptions) {
+                await webpush.sendNotification(sub.subscription, payload);
             }
 
             pendingCacheUpdates.push({uid, cacheKey: `${playlistId}_${uid}`, newSet: [...currentSet]});
