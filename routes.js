@@ -55,8 +55,12 @@ const ensureAuth = async (req, res, next) => {
 };
 
 router.get('/cache-status', ensureAuth, async (req, res) => {
-    await cache.rebuild(req.uid, req.token);
-    res.json(cache.getCacheStatus(req.uid));
+    const st = cache.getCacheStatus(req.uid);
+    if (!st.loading && st.totalArtists === 0) {
+        cache.rebuild(req.uid, req.token)
+            .catch(err => console.error(err));
+    }
+    res.json(st);
 });
 
 router.get('/latest', ensureAuth, (req, res) => {
