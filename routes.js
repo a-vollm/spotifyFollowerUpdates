@@ -87,12 +87,23 @@ router.get('/playlist/:id', ensureAuth, async (req, res) => {
 
 router.post('/subscribe', (req, res) => {
     try {
-        if (!subscriptions.find(s => JSON.stringify(s) === JSON.stringify(req.body))) subscriptions.push(req.body);
+        const uid = req.headers['x-user-id'];
+        if (!uid) return res.status(400).json({error: 'missing_uid'});
+
+        const entry = {
+            uid,
+            subscription: req.body
+        };
+
+        const exists = subscriptions.find(s => JSON.stringify(s) === JSON.stringify(entry));
+        if (!exists) subscriptions.push(entry);
+
         res.status(201).json({success: true});
     } catch (err) {
         console.error('Subscription Error:', err.message);
         res.status(500).json({error: err.message});
     }
 });
+
 
 module.exports = {router, subscriptions};
