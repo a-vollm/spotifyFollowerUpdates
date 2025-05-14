@@ -1,5 +1,5 @@
 const axios = require('axios');
-const tokenStore = require('./tokenStore')
+const tokenStore = require('./tokenStore');
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const AXIOS_TIMEOUT = 25_000;
 
@@ -91,7 +91,7 @@ async function rebuild(uid, token) {
 
     } catch (err) {
         console.error(`[${uid}] Cache rebuild failed:`, err.message);
-        if ([401, 429].includes(err.response?.status)) {
+        if (err.response?.status === 401) {
             const {SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET} = process.env;
             const qs = require('querystring');
             const axios = require('axios');
