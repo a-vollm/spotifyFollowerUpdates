@@ -105,18 +105,11 @@ cron.schedule('*/1 * * * *', async () => {
 
             // 4. Push senden
             console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
-            // Filtere ungültige Subscriptions
-            for (const sub of subscriptions.filter(Boolean)) {
-                try {
-                    await webpush.sendNotification(sub, payload);
-                    console.log(`📨 Benachrichtigung an ${sub.endpoint} gesendet`);
-                } catch (err) {
-                    console.error(`❌ Push fehlgeschlagen für ${sub.endpoint}:`, err.message);
-                    // Entferne ungültige Subscriptions
-                    subscriptions.splice(subscriptions.indexOf(sub), 1);
-                }
+            for (const sub of subscriptions) {
+                await webpush.sendNotification(sub, payload);
             }
 
+            // 5. Cache aktualisieren
             await tokenStore.setPlaylistCache(`${playlistId}_${uid}`, [...currentSet]);
             console.log('✅ Playlist-Cache aktualisiert.');
 
