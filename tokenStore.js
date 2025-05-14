@@ -3,9 +3,7 @@ const {Pool} = require('pg');
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {rejectUnauthorized: false},
-    host: new URL(process.env.DATABASE_URL).hostname,
-    port: 5432,
-    connectionTimeoutMillis: 3000
+    connectionTimeoutMillis: 5000
 });
 
 exports.get = async (uid) => {
