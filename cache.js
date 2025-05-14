@@ -18,7 +18,6 @@ function getCache(uid) {
     return userCaches.get(uid);
 }
 
-/* ----------  HIER: Reihenfolge uid, token  ---------- */
 async function rebuild(uid, token) {
     const cache = getCache(uid);
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
@@ -36,6 +35,14 @@ async function rebuild(uid, token) {
 
         cache.status.totalArtists = allArtists.length;
 
+        /* ---------- EARLY-EXIT: Nutzer folgt niemandem ---------- */
+        if (allArtists.length === 0) {
+            cache.latest = [];
+            cache.releases = {};
+            cache.status.loading = false;
+            return;                                // sofort abbrechen
+        }
+
         /* ---------- Releases holen ---------- */
         const allAlbums = [];
         for (const artist of allArtists) {
@@ -49,6 +56,14 @@ async function rebuild(uid, token) {
             allAlbums.push(...r.data.items);
             cache.status.doneArtists++;
             await new Promise(res => setTimeout(res, 100));      // nur für UI-Progress
+        }
+
+        /* ---------- EARLY-EXIT: keine Releases gefunden ---------- */
+        if (allAlbums.length === 0) {
+            cache.latest = [];
+            cache.releases = {};
+            cache.status.loading = false;
+            return;                                // sofort abbrechen
         }
 
         /* ---------- Gruppieren nach Jahr/Monat ---------- */
@@ -81,7 +96,6 @@ async function rebuild(uid, token) {
     }
 }
 
-/* -------- Playlist-Helfer bleibt unverändert -------- */
 async function getPlaylistData(playlistId, token) {
     const urlBase = `${SPOTIFY_API}/playlists/${playlistId}`;
     const playlist = (await axios.get(urlBase, {headers: {Authorization: `Bearer ${token}`}})).data;
