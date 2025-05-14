@@ -105,8 +105,16 @@ cron.schedule('*/2 * * * *', async () => {
 
             // 4. Push senden
             console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
-            for (const sub of subscriptions) {
-                await webpush.sendNotification(sub, payload);
+            // Filtere ungültige Subscriptions
+            for (const sub of subscriptions.filter(Boolean)) {
+                try {
+                    await webpush.sendNotification(sub, payload);
+                    console.log(`📨 Benachrichtigung an ${sub.endpoint} gesendet`);
+                } catch (err) {
+                    console.error(`❌ Push fehlgeschlagen für ${sub.endpoint}:`, err.message);
+                    // Entferne ungültige Subscriptions
+                    subscriptions.splice(subscriptions.indexOf(sub), 1);
+                }
             }
 
             // 5. Cache aktualisieren
