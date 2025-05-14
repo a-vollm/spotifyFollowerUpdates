@@ -43,7 +43,7 @@ function compareSets(oldSet, newSet) {
     return {added, removed};
 }
 
-cron.schedule('*/2 * * * *', async () => {
+cron.schedule('*/1 * * * *', async () => {
     console.log('🎧 Starte Playlist-Check...');
     const playlistId = '4QTlILYEMucSKLHptGxjAq';
     const allTokens = await tokenStore.all();
