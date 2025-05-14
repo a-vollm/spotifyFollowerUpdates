@@ -59,6 +59,7 @@ router.get('/cache-status', ensureAuth, async (req, res) => {
     const st = cache.getCacheStatus(req.uid);
     if (!st.loading && st.totalArtists === 0) {
         st.loading = true;
+        await new Promise(r => setTimeout(r, 1000));
         await cache.rebuild(req.uid, req.token).catch(err => console.error(err));
     }
     res.json(cache.getCacheStatus(req.uid));

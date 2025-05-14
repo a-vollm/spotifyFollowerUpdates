@@ -72,22 +72,23 @@ cron.schedule('*/2 * * * *', async () => {
 
             // 3. Benachrichtigung erstellen
             let addedByName = null;
+            const parts = [];
+
             if (added.length > 0) {
-                const addedTrack = data.tracks.find(t => added.includes(t.track.id));
-                addedByName = addedTrack?.added_by?.display_name || "Unbekannt";
-                console.log(`👤 Hinzugefügt von: ${addedByName}`);
+                const addedText = added.length === 1
+                    ? `${addedByName} hat 1 neuen Track hinzugefügt`
+                    : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`;
+                parts.push(addedText);
             }
 
-            const addText = added.length === 1
-                ? `${addedByName} hat 1 neuen Track hinzugefügt`
-                : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`;
+            if (removed.length > 0) {
+                const removedText = removed.length === 1
+                    ? `1 Track wurde entfernt`
+                    : `${removed.length} Tracks wurden entfernt`;
+                parts.push(removedText);
+            }
 
-            const removeText = removed.length === 1
-                ? `1 Track wurde entfernt`
-                : `${removed.length} Tracks wurden entfernt`;
-
-            const fullText = [addText, removeText].filter(Boolean).join(' • ');
-
+            const fullText = parts.join(' • ');
             const payload = JSON.stringify({
                 notification: {
                     title: `${data.name}`,

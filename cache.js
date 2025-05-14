@@ -91,11 +91,44 @@ async function rebuild(uid, token) {
 
     } catch (err) {
         console.error(`[${uid}] Cache rebuild failed:`, err.message);
-        // Bei 401: Token als ungültig markieren
         if (err.response?.status === 401) {
-            await tokenStore.delete(uid);
-            console.log(`♻️ Token für ${uid} ungültig – bitte neu anmelden.`);
+            const {SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET} = process.env;
+            const qs = require('querystring');
+            const axios = require('axios');
+            const saved = await tokenStore.get(uid);
+            if (saved?.refresh) {
+                try {
+                    const resToken = await axios.post(
+                        'https://accounts.spotify.com/api/token',
+                        qs.stringify({
+                            grant_type: 'refresh_token',
+                            refresh_token: saved.refresh
+                        }),
+                        {
+                            headers: {
+                                Authorization: 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            }
+                        }
+                    );
+                    saved.access = resToken.data.access_token;
+                    saved.exp = Date.now() / 1000 + resToken.data.expires_in;
+                    if (resToken.data.refresh_token) {
+                        saved.refresh = resToken.data.refresh_token;
+                    }
+                    await tokenStore.set(uid, saved);
+                    console.log(`🔁 Token erneuert für ${uid} – erneuter rebuild`);
+                    return await rebuild(uid, saved.access); // 🟢 Neustart mit neuem Token
+                } catch (e) {
+                    console.error(`❌ Refresh fehlgeschlagen für ${uid}:`, e.message);
+                    await tokenStore.delete(uid);
+                }
+            } else {
+                console.warn(`⚠️ Kein Refresh-Token vorhanden für ${uid}`);
+                await tokenStore.delete(uid);
+            }
         }
+
     } finally {
         cache.status.loading = false;
     }
