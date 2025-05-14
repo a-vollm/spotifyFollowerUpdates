@@ -91,7 +91,7 @@ async function rebuild(uid, token) {
 
     } catch (err) {
         console.error(`[${uid}] Cache rebuild failed:`, err.message);
-        if (err.response?.status === 401) {
+        if ([401, 429].includes(err.response?.status)) {
             const {SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET} = process.env;
             const qs = require('querystring');
             const axios = require('axios');
