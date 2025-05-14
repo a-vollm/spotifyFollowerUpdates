@@ -10,7 +10,7 @@ const ensureAuth = async (req, res, next) => {
     const uid = req.headers['x-user-id'];
     if (!uid) return res.status(401).json({error: 'no_uid'});
 
-    let token = store.get(uid);
+    let token = await store.get(uid);
     const now = Date.now() / 1000;
 
     if (!token || !token.access) {
@@ -18,7 +18,6 @@ const ensureAuth = async (req, res, next) => {
         return res.status(401).json({error: 'token_missing'});
     }
 
-    // ⏳ Token ist abgelaufen oder in <30s → versuch direkten Refresh
     if (token.exp - now < 30) {
         try {
             const resToken = await axios.post(

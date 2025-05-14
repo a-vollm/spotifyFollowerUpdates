@@ -1,36 +1,35 @@
-const fs = require('fs');
-const path = require('path');
+const {Pool} = require('pg');
 
-const file = process.env.TOKEN_FILE || path.resolve(__dirname, 'tokens.json');
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {rejectUnauthorized: false}
+});
 
-function read() {
-    try {
-        const raw = fs.readFileSync(file, 'utf-8');
-        return JSON.parse(raw);
-    } catch {
-        return {};
-    }
-}
-
-function write(data) {
-    fs.writeFileSync(file, JSON.stringify(data, null, 2));
-}
-
-exports.get = (userId) => {
-    const all = read();
-    return all[userId] || null;
+exports.get = async (uid) => {
+    const res = await pool.query('SELECT * FROM tokens WHERE uid = $1', [uid]);
+    return res.rows[0] || null;
 };
 
-exports.set = (userId, tokenData) => {
-    const all = read();
-    all[userId] = tokenData;
-    write(all);
+exports.set = async (uid, token) => {
+    await pool.query(`
+        INSERT INTO tokens (uid, access, refresh, exp)
+        VALUES ($1, $2, $3, $4) ON CONFLICT (uid)
+    DO
+        UPDATE SET access = EXCLUDED.access, refresh = EXCLUDED.refresh, exp = EXCLUDED.exp, updated_at = CURRENT_TIMESTAMP
+    `, [uid, token.access, token.refresh, token.exp]);
 };
 
-exports.delete = (userId) => {
-    const all = read();
-    delete all[userId];
-    write(all);
+exports.delete = async (uid) => {
+    await pool.query('DELETE FROM tokens WHERE uid = $1', [uid]);
 };
 
-exports.all = () => read();
+exports.all = async () => {
+    const res = await pool.query('SELECT * FROM tokens');
+    return Object.fromEntries(
+        res.rows.map(row => [row.uid, {
+            access: row.access,
+            refresh: row.refresh,
+            exp: row.exp
+        }])
+    );
+};

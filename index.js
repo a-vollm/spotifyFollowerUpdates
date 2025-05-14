@@ -52,7 +52,7 @@ function compareSets(oldSet, newSet) {
 
 cron.schedule('* * * * *', async () => {
     const playlistId = '4QTlILYEMucSKLHptGxjAq';
-    const allTokens = require('./tokenStore').all();
+    const allTokens = await require('./tokenStore').all();
     const token = Object.values(allTokens)[0]?.access;
     if (!token) return;
 
@@ -112,7 +112,7 @@ cron.schedule('* * * * *', async () => {
 });
 
 cron.schedule('0 * * * *', async () => {
-    const allTokens = require('./tokenStore').all();
+    const allTokens = await require('./tokenStore').all();
     const tokens = Object.values(allTokens);
 
     if (!tokens.length) return;

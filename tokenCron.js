@@ -10,7 +10,7 @@ const {
 
 cron.schedule('*/10 * * * *', async () => {
     const now = Date.now() / 1000;
-    const allTokens = tokenStore.all();
+    const allTokens = await tokenStore.all();
 
     for (const [userId, token] of Object.entries(allTokens)) {
         if (token.exp - now < 600) {
@@ -31,7 +31,7 @@ cron.schedule('*/10 * * * *', async () => {
 
                 token.access = res.data.access_token;
                 token.exp = now + res.data.expires_in;
-                tokenStore.set(userId, token);
+                await tokenStore.set(userId, token);
                 console.log(`✅ Refreshed token for ${userId}`);
             } catch (err) {
                 console.error(`❌ Failed to refresh ${userId}:`, err.message);

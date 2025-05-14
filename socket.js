@@ -13,17 +13,18 @@ module.exports = {
             }
         });
 
-        io.on('connection', (socket) => {
+        io.on('connection', async (socket) => {
             const uid = socket.handshake.auth?.uid;
 
-            if (!uid || !tokenStore.get(uid)) {
+            const token = uid ? await tokenStore.get(uid) : null;
+            if (!token) {
                 console.log('❌ Socket rejected – ungültige oder fehlende UID');
                 socket.disconnect();
                 return;
             }
 
             console.log(`✅ Socket verbunden für UID: ${uid}`);
-            socket.join(uid); // optional: für gezielte Events wie io.to(uid).emit(...)
+            socket.join(uid);
         });
 
         return io;

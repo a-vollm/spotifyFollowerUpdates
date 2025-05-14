@@ -46,7 +46,7 @@ router.get('/auth/spotify/callback', async (req, res) => {
     });
     const uid = me.data.id;
 
-    tokenStore.set(uid, {
+    await tokenStore.set(uid, {
         access: access_token,
         refresh: refresh_token,
         exp: Date.now() / 1000 + expires_in
@@ -60,7 +60,7 @@ router.get('/auth/spotify/callback', async (req, res) => {
 
 router.post('/auth/refresh', async (req, res) => {
     const {uid} = req.body;
-    const saved = tokenStore.get(uid);
+    const saved = await tokenStore.get(uid);
     if (!saved) return res.sendStatus(400);
 
     const tok = await axios.post(
@@ -76,7 +76,7 @@ router.post('/auth/refresh', async (req, res) => {
 
     saved.access = tok.data.access_token;
     saved.exp = Date.now() / 1000 + tok.data.expires_in;
-    tokenStore.set(uid, saved);
+    await tokenStore.set(uid, saved);
 
     res.json({access: saved.access, expires_in: tok.data.expires_in});
 });

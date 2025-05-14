@@ -1,9 +1,7 @@
 const axios = require('axios');
-const tokenStore = require('./tokenStore');
 
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const AXIOS_TIMEOUT = 25000;
-const MAX_FIRST_ARTISTS = 20;
 
 const cache = {
     status: {loading: false, totalArtists: 0, doneArtists: 0},
