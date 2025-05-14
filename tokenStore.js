@@ -3,34 +3,33 @@ const {Pool} = require('pg');
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {rejectUnauthorized: false},
-    connectionTimeoutMillis: 5000
+    connectionTimeoutMillis: 5000,
+    family: 4              // ⬅️  IPv4 only – verhindert ENETUNREACH
 });
 
 exports.get = async (uid) => {
-    const res = await pool.query('SELECT * FROM tokens WHERE uid = $1', [uid]);
-    return res.rows[0] || null;
+    const {rows} = await pool.query('SELECT * FROM tokens WHERE uid = $1', [uid]);
+    return rows[0] || null;
 };
 
-exports.set = async (uid, token) => {
+exports.set = async (uid, t) => {
     await pool.query(`
         INSERT INTO tokens (uid, access, refresh, exp)
         VALUES ($1, $2, $3, $4) ON CONFLICT (uid)
-    DO
-        UPDATE SET access = EXCLUDED.access, refresh = EXCLUDED.refresh, exp = EXCLUDED.exp, updated_at = CURRENT_TIMESTAMP
-    `, [uid, token.access, token.refresh, token.exp]);
+      DO
+        UPDATE SET access=EXCLUDED.access,
+            refresh=EXCLUDED.refresh,
+            exp=EXCLUDED.exp,
+            updated_at = CURRENT_TIMESTAMP
+    `, [uid, t.access, t.refresh, t.exp]);
 };
 
-exports.delete = async (uid) => {
-    await pool.query('DELETE FROM tokens WHERE uid = $1', [uid]);
-};
+exports.delete = (uid) =>
+    pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
 
 exports.all = async () => {
-    const res = await pool.query('SELECT * FROM tokens');
+    const {rows} = await pool.query('SELECT * FROM tokens');
     return Object.fromEntries(
-        res.rows.map(row => [row.uid, {
-            access: row.access,
-            refresh: row.refresh,
-            exp: row.exp
-        }])
+        rows.map(r => [r.uid, {access: r.access, refresh: r.refresh, exp: r.exp}])
     );
 };
