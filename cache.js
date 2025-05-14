@@ -2,8 +2,8 @@ const axios = require('axios');
 const tokenStore = require('./tokenStore');
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const AXIOS_TIMEOUT = 25000;
-const RATE_LIMIT_DELAY = 1000; // 1 second between batches
-const BATCH_SIZE = 20; // Artists per batch
+const ARTIST_REQUEST_DELAY = 250; // 250ms zwischen Artist-Requests
+const PLAYLIST_DELAY = 1000; // 1s zwischen Paginierungen
 
 const api = axios.create({
     timeout: AXIOS_TIMEOUT,
@@ -26,7 +26,7 @@ async function safeApiCall(config, retries = 3) {
     }
 }
 
-// Get all paginated data
+// Get all paginated data mit Response-Validierung
 async function getAllPages(url, token) {
     let items = [];
     while (url) {
@@ -34,9 +34,14 @@ async function getAllPages(url, token) {
             url,
             headers: {Authorization: `Bearer ${token}`}
         });
+
+        if (!data?.items || !Array.isArray(data.items)) {
+            throw new Error(`Invalid API response structure for ${url}`);
+        }
+
         items = [...items, ...data.items];
         url = data.next;
-        await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY));
+        await new Promise(r => setTimeout(r, PLAYLIST_DELAY));
     }
     return items;
 }
@@ -54,42 +59,48 @@ function getCache(uid) {
     return userCaches.get(uid);
 }
 
-// Batch artist album requests
-async function getBatchAlbums(artistIds, token) {
-    const params = {ids: artistIds.join(','), include_groups: 'album,single'};
-    const data = await safeApiCall({
-        url: `${SPOTIFY_API}/artists`,
-        params,
-        headers: {Authorization: `Bearer ${token}`}
-    });
-    return data.artists.flatMap(artist => artist.albums?.items || []);
-}
-
 async function rebuild(uid, token) {
     const cache = getCache(uid);
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
     try {
-        // Get followed artists
-        const artists = await getAllPages(
-            `${SPOTIFY_API}/me/following?type=artist&limit=50`,
-            token
-        );
+        // Get followed artists mit korrekter Paginierung
+        let artists = [];
+        let url = `${SPOTIFY_API}/me/following?type=artist&limit=50`;
+
+        while (url) {
+            const data = await safeApiCall({
+                url,
+                headers: {Authorization: `Bearer ${token}`}
+            });
+
+            if (data?.artists?.items) {
+                artists = [...artists, ...data.artists.items];
+                url = data.artists.next;
+            } else {
+                throw new Error('Invalid artist follow response');
+            }
+            await new Promise(r => setTimeout(r, ARTIST_REQUEST_DELAY));
+        }
 
         cache.status.totalArtists = artists.length;
         if (!artists.length) return;
 
-        // Process artists in batches
+        // Einzelne Artist-Album-Requests mit Delay
         const allAlbums = [];
-        for (let i = 0; i < artists.length; i += BATCH_SIZE) {
-            const batch = artists.slice(i, i + BATCH_SIZE);
-            const batchAlbums = await getBatchAlbums(
-                batch.map(a => a.id),
-                token
-            );
-            allAlbums.push(...batchAlbums);
-            cache.status.doneArtists += batch.length;
-            await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY));
+        for (const artist of artists) {
+            try {
+                const albums = await safeApiCall({
+                    url: `${SPOTIFY_API}/artists/${artist.id}/albums`,
+                    headers: {Authorization: `Bearer ${token}`},
+                    params: {include_groups: 'album,single', limit: 50}
+                });
+                allAlbums.push(...albums.items);
+                cache.status.doneArtists++;
+                await new Promise(r => setTimeout(r, ARTIST_REQUEST_DELAY));
+            } catch (err) {
+                console.error(`Failed to get albums for ${artist.id}:`, err.message);
+            }
         }
 
         if (!allAlbums.length) return;
@@ -116,7 +127,11 @@ async function rebuild(uid, token) {
             .slice(0, 20);
 
     } catch (err) {
-        console.error(`[${uid}] Rebuild failed:`, err.message);
+        console.error(`[${uid}] Rebuild failed:`, {
+            message: err.message,
+            url: err.config?.url,
+            status: err.response?.status
+        });
         if (err.response?.status === 401) await handleTokenRefresh(uid);
     } finally {
         cache.status.loading = false;
@@ -128,7 +143,8 @@ async function handleTokenRefresh(uid) {
     if (!saved?.refresh) return;
 
     try {
-        const {data} = await axios.post('https://accounts.spotify.com/api/token',
+        const {data} = await axios.post(
+            'https://accounts.spotify.com/api/token',
             new URLSearchParams({grant_type: 'refresh_token', refresh_token: saved.refresh}),
             {
                 headers: {
@@ -182,7 +198,11 @@ async function getPlaylistData(playlistId, token) {
             }))
         };
     } catch (error) {
-        console.error('Playlist fetch failed:', error.message);
+        console.error('Playlist fetch failed:', {
+            message: error.message,
+            url: error.config?.url,
+            status: error.response?.status
+        });
         throw error;
     }
 }
