@@ -1,75 +1,77 @@
 const {Pool} = require('pg');
 const dns = require('dns').promises;
-const {setTimeout} = require('timers/promises');
+
+// Hardcoded IPv4 address from Supabase (REPLACE WITH YOUR ACTUAL IPv4)
+const SUPABASE_IPV4 = 'YOUR_SUPABASE_IPv4_ADDRESS'; // Get this from Supabase dashboard
+const DB_HOST = 'db.nnojnnqlolbqovvoetfh.supabase.co';
 
 let pool;
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000;
 
-async function resolveHost() {
+async function verifyIPv4() {
     try {
-        // First try explicit IPv4 resolution
-        const ips = await dns.resolve4('db.nnojnnqlolbqovvoetfh.supabase.co');
-        return ips[0];
-    } catch (error) {
-        // Fallback to OS resolution with IPv4 priority
-        dns.setDefaultResultOrder('ipv4first');
-        const lookup = await dns.lookup('db.nnojnnqlolbqovvoetfh.supabase.co');
-        return lookup.address;
-    }
-}
+        // Verify DNS records
+        const [v4Addrs, v6Addrs] = await Promise.all([
+            dns.resolve4(DB_HOST).catch(() => []),
+            dns.resolve6(DB_HOST).catch(() => [])
+        ]);
 
-async function createPool(retries = MAX_RETRIES) {
-    try {
-        const host = await resolveHost();
-        console.log(`Using database host: ${host}`);
+        console.log('DNS Verification:');
+        console.log(`IPv4 Addresses: ${v4Addrs.join(', ') || 'None'}`);
+        console.log(`IPv6 Addresses: ${v6Addrs.join(', ') || 'None'}`);
 
-        return new Pool({
-            host,
-            user: 'postgres',
-            password: process.env.DATABASE_PASSWORD,
-            database: 'postgres',
-            port: 5432,
-            ssl: {
-                rejectUnauthorized: false,
-                servername: 'db.nnojnnqlolbqovvoetfh.supabase.co'
-            },
-            connectionTimeoutMillis: 10000,
-            // Final enforcement at TCP layer
-            lookup: (host, options, callback) =>
-                dns.lookup(host, {family: 4}, callback)
-        });
-    } catch (error) {
-        if (retries > 0) {
-            console.log(`Retrying connection... (${retries} left)`);
-            await setTimeout(RETRY_DELAY);
-            return createPool(retries - 1);
+        if (v4Addrs.length === 0) {
+            throw new Error('No IPv4 DNS records found. Contact Supabase support.');
         }
-        throw new Error(`Database connection failed: ${error.message}`);
+
+        return v4Addrs[0];
+    } catch (error) {
+        console.error('DNS verification failed:', error);
+        console.log('Falling back to hardcoded IPv4:', SUPABASE_IPV4);
+        return SUPABASE_IPV4;
     }
 }
 
-// Initialize connection immediately
-createPool().then(p => {
-    pool = p;
-    console.log('Database connection established');
-}).catch(error => {
-    console.error('Fatal database error:', error);
-    process.exit(1);
-});
+async function initializePool() {
+    const ipv4 = await verifyIPv4();
 
-// Unified query handler with connection check
-async function query(sql, params) {
-    if (!pool) {
-        console.log('No active pool - reinitializing');
-        pool = await createPool();
+    pool = new Pool({
+        host: ipv4,
+        user: 'postgres',
+        password: process.env.DATABASE_PASSWORD,
+        database: 'postgres',
+        port: 5432,
+        ssl: {
+            rejectUnauthorized: false,
+            servername: DB_HOST // Maintain TLS SNI
+        },
+        connectionTimeoutMillis: 10000,
+        // Final enforcement
+        lookup: (host, options, callback) => {
+            dns.lookup(host, {family: 4}, (err, address) => {
+                if (err) return callback(err);
+                console.log(`DNS lookup result: ${address}`);
+                callback(null, address, 4);
+            });
+        }
+    });
+
+    // Test connection
+    try {
+        const client = await pool.connect();
+        client.release();
+        console.log('Successfully connected to database via IPv4');
+    } catch (error) {
+        console.error('Connection test failed:', error);
+        process.exit(1);
     }
-    return pool.query(sql, params);
 }
 
-// CRUD functions using unified handler
+// Initialize immediately
+initializePool();
+
+// CRUD functions with connection check
 exports.get = async (uid) => {
-    const {rows} = await query('SELECT access, refresh, exp FROM tokens WHERE uid=$1', [uid]);
+    const {rows} = await pool.query('SELECT access, refresh, exp FROM tokens WHERE uid=$1', [uid]);
     return rows[0] || null;
 };
 
