@@ -43,59 +43,60 @@ function compareSets(oldSet, newSet) {
     return {added, removed};
 }
 
-cron.schedule('* * * * *', async () => {
+cron.schedule('*/1 * * * *', async () => {
     const playlistId = '4QTlILYEMucSKLHptGxjAq';
     const allTokens = await tokenStore.all();
-    const token = Object.values(allTokens)[0]?.access;
-    if (!token) return;
 
-    try {
-        const data = await cache.getPlaylistData(playlistId, token);
-        const currentSet = getTrackIds(data);
-        const oldSet = await getPlaylistCache(playlistId);
+    for (const [uid, token] of Object.entries(allTokens)) {
+        try {
+            const data = await cache.getPlaylistData(playlistId, token.access);
+            const currentSet = getTrackIds(data);
+            const oldSet = await tokenStore.getPlaylistCache(`${playlistId}_${uid}`);
+            const {added, removed} = compareSets(oldSet, currentSet);
 
-        const {added, removed} = compareSets(oldSet, currentSet);
-        await setPlaylistCache(playlistId, [...currentSet]);
+            await tokenStore.setPlaylistCache(`${playlistId}_${uid}`, [...currentSet]);
 
-        if (added.length === 0 && removed.length === 0) return;
+            if (added.length === 0 && removed.length === 0) continue;
 
-        let addedByName = null;
-        if (added.length > 0) {
-            const addedTrack = data.tracks.find(t => added.includes(t.track.id));
-            addedByName = addedTrack?.added_by?.display_name || null;
-        }
-
-        const addText = added.length === 1
-            ? `${addedByName} hat 1 neuen Track hinzugefügt`
-            : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`;
-
-        const removeText = removed.length === 1
-            ? `1 Track wurde entfernt`
-            : `${removed.length} Tracks wurden entfernt`;
-
-        const fullText = [addText, removeText].filter(Boolean).join(' • ');
-
-        const payload = JSON.stringify({
-            notification: {
-                title: `${data.name}`,
-                body: fullText,
-                icon: '/assets/icons/icon-192x192.png',
-                badge: '/assets/icons/badge.png',
-                tag: 'playlist-tracking',
-                renotify: true,
-                silent: false,
-                requireInteraction: true,
-                data: {origin: 'playlist-monitor'}
+            let addedByName = null;
+            if (added.length > 0) {
+                const addedTrack = data.tracks.find(t => added.includes(t.track.id));
+                addedByName = addedTrack?.added_by?.display_name || null;
             }
-        });
 
-        for (const sub of subscriptions) {
-            await webpush.sendNotification(sub, payload);
+            const addText = added.length === 1
+                ? `${addedByName} hat 1 neuen Track hinzugefügt`
+                : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`;
+
+            const removeText = removed.length === 1
+                ? `1 Track wurde entfernt`
+                : `${removed.length} Tracks wurden entfernt`;
+
+            const fullText = [addText, removeText].filter(Boolean).join(' • ');
+
+            const payload = JSON.stringify({
+                notification: {
+                    title: `${data.name}`,
+                    body: fullText,
+                    icon: '/assets/icons/icon-192x192.png',
+                    badge: '/assets/icons/badge.png',
+                    tag: `playlist-tracking-${uid}`,
+                    renotify: true,
+                    silent: false,
+                    requireInteraction: true,
+                    data: {origin: 'playlist-monitor'}
+                }
+            });
+
+            for (const sub of subscriptions) {
+                await webpush.sendNotification(sub, payload);
+            }
+        } catch (err) {
+            console.error(`Fehler bei Playlist-Check für UID ${uid}:`, err.message);
         }
-    } catch (err) {
-        console.error('Fehler bei Playlist-Check:', err.message);
     }
 });
+
 
 cron.schedule('0 * * * *', async () => {
     const allTokens = await tokenStore.all();
