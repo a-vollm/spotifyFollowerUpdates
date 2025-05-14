@@ -57,11 +57,24 @@ const ensureAuth = async (req, res, next) => {
 
 router.get('/cache-status', ensureAuth, async (req, res) => {
     const st = cache.getCacheStatus(req.uid);
+
+    // Wenn nichts geladen ist UND kein laufender Rebuild
     if (!st.loading && st.totalArtists === 0) {
-        st.loading = true;
-        await new Promise(r => setTimeout(r, 1000));
-        await cache.rebuild(req.uid, req.token).catch(err => console.error(err));
+
+        // Wenn noch nie fehlgeschlagen oder Fehler ist lange her → rebuild versuchen
+        if (!st.lastFailed || Date.now() - st.lastFailed > 15 * 60 * 1000) {
+            console.log(`🚀 Starte ersten Rebuild für ${req.uid}`);
+            st.loading = true;
+            await new Promise(r => setTimeout(r, 500)); // minimale Verzögerung
+            await cache.rebuild(req.uid, req.token).catch(err => {
+                console.error(`[${req.uid}] Rebuild fehlgeschlagen:`, err.message);
+                st.lastFailed = Date.now(); // merke Zeitpunkt
+            });
+        } else {
+            console.log(`⏳ Rebuild für ${req.uid} kürzlich fehlgeschlagen – überspringe`);
+        }
     }
+
     res.json(cache.getCacheStatus(req.uid));
 });
 

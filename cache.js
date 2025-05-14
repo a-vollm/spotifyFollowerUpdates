@@ -10,7 +10,7 @@ const userCaches = new Map();
 function getCache(uid) {
     if (!userCaches.has(uid)) {
         userCaches.set(uid, {
-            status: {loading: false, totalArtists: 0, doneArtists: 0},
+            status: {loading: false, totalArtists: 0, doneArtists: 0, lastFailed: null},
             latest: [],
             releases: {}
         });
@@ -20,7 +20,7 @@ function getCache(uid) {
 
 async function rebuild(uid, token) {
     const cache = getCache(uid);
-    cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
+    cache.status = {loading: true, totalArtists: 0, doneArtists: 0,};
 
     try {
         /* ---------- Gefolgte Artists holen ---------- */
