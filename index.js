@@ -11,7 +11,6 @@ const {initAuth} = require('./auth');
 const {router: apiRouter, subscriptions} = require('./routes');
 const cache = require('./cache');
 const tokenStore = require('./tokenStore');
-const {getPlaylistCache, setPlaylistCache} = require('./tokenStore');
 const io = require('./socket').init(server);
 
 webpush.setVapidDetails(
