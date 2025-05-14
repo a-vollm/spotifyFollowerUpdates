@@ -2,15 +2,18 @@ const {Pool} = require('pg');
 
 const pool = new Pool({
     user: 'postgres',
-    password: process.env.DATABASE_PASSWORD, // dein Passwort aus env
-    host: '34.159.240.88',                   // ⬅️ IPv4 hart gesetzt
+    password: process.env.DATABASE_PASSWORD,
+    host: 'db.nnojnnqlolbqovvoetfh.supabase.co',
     database: 'postgres',
     port: 5432,
-    ssl: {rejectUnauthorized: false},
-    connectionTimeoutMillis: 5000
+    ssl: {
+        rejectUnauthorized: false,
+        servername: 'db.nnojnnqlolbqovvoetfh.supabase.co' // Erzwingt SSL-SNI
+    },
+    connectionTimeoutMillis: 10000,
+    family: 4 // IPv4 erzwingen
 });
 
-// CRUD-Funktionen (unverändert korrekt!)
 exports.get = async (uid) => {
     const {rows} = await pool.query('SELECT access, refresh, exp FROM tokens WHERE uid=$1', [uid]);
     return rows[0] || null;
