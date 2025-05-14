@@ -48,16 +48,18 @@ cron.schedule('*/1 * * * *', async () => {
     const allTokens = await tokenStore.all();
     console.log(`🔑 Gefundene Benutzer: ${Object.keys(allTokens).length}`);
 
+    // Hole den aktuellen gemeinsamen Stand EINMAL
+    const sampleToken = Object.values(allTokens)[0];
+    const data = await cache.getPlaylistData(playlistId, sampleToken.access);
+    const currentSet = getTrackIds(data);
+    console.log(`📀 Aktuelle Playlist "${data.name}" hat ${data.tracks.length} Tracks`);
+
     const pendingCacheUpdates = [];
 
     for (const [uid, token] of Object.entries(allTokens)) {
         try {
             console.log(`\n--- Prüfe UID ${uid} ---`);
 
-            const data = await cache.getPlaylistData(playlistId, token.access);
-            console.log(`🎵 Playlist "${data.name}" hat ${data.tracks.length} Tracks`);
-
-            const currentSet = getTrackIds(data);
             const oldSet = await tokenStore.getPlaylistCache(`${playlistId}_${uid}`);
             console.log(`🗃️ Alte Tracks: ${oldSet.size}, Aktuelle Tracks: ${currentSet.size}`);
 
