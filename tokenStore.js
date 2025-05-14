@@ -1,4 +1,5 @@
 const {Pool} = require('pg');
+const dns = require('dns');
 
 const pool = new Pool({
     user: 'postgres',
@@ -11,9 +12,12 @@ const pool = new Pool({
         servername: 'db.nnojnnqlolbqovvoetfh.supabase.co'
     },
     connectionTimeoutMillis: 10000,
-    family: 4 // IPv4 erzwingen
 });
 
+// IPv4 DNS erzwingen
+dns.setDefaultResultOrder('ipv4first');
+
+// CRUD-Funktionen (wie zuvor)
 exports.get = async (uid) => {
     const {rows} = await pool.query('SELECT access, refresh, exp FROM tokens WHERE uid=$1', [uid]);
     return rows[0] || null;
@@ -27,7 +31,7 @@ exports.set = async (uid, t) => {
         UPDATE SET access=EXCLUDED.access,
             refresh=EXCLUDED.refresh,
             exp=EXCLUDED.exp,
-            updated_at = CURRENT_TIMESTAMP
+            updated_at= CURRENT_TIMESTAMP
     `, [uid, t.access, t.refresh, t.exp]);
 };
 
