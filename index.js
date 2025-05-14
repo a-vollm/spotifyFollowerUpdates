@@ -184,10 +184,18 @@ cron.schedule('*/30 * * * *', async () => {
 
 cron.schedule('*/15 * * * *', async () => {
     const tokens = await tokenStore.all();
+
     for (const [uid, token] of Object.entries(tokens)) {
-        await cache.rebuild(uid, token.access);
+        try {
+            console.log(`🔄 Starte Rebuild für UID ${uid}`);
+            await cache.rebuild(uid, token.access);
+        } catch (err) {
+            console.error(`❌ Fehler beim Rebuild für ${uid}:`, err.message);
+        }
+        await new Promise(r => setTimeout(r, 10000));
     }
 });
+
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
