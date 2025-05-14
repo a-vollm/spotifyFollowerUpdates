@@ -55,17 +55,12 @@ const ensureAuth = async (req, res, next) => {
 };
 
 router.get('/cache-status', ensureAuth, async (req, res) => {
-    const uid = req.uid;          // aus ensureAuth
-    const token = req.token;
-
-    const st = cache.getCacheStatus(uid);
-
-    const needsRebuild = !st.loading && (st.totalArtists === 0 || st.doneArtists < st.totalArtists);
-    if (needsRebuild) {
-        cache.rebuild(uid, token).catch(console.error);
+    const st = cache.getCacheStatus(req.uid);
+    if (!st.loading && st.totalArtists === 0) {
+        st.loading = true;
+        await cache.rebuild(req.uid, req.token).catch(err => console.error(err));
     }
-
-    res.json(st);
+    res.json(cache.getCacheStatus(req.uid));
 });
 
 
