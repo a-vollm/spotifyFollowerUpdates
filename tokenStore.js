@@ -23,11 +23,10 @@ exports.get = async (uid) => {
 };
 
 exports.set = async (uid, t) => {
-    await initializePool();
     await pool.query(`
         INSERT INTO tokens (uid, access, refresh, exp)
         VALUES ($1, $2, $3, $4) ON CONFLICT (uid)
-      DO
+    DO
         UPDATE SET access=EXCLUDED.access,
             refresh=EXCLUDED.refresh,
             exp=EXCLUDED.exp,
@@ -36,12 +35,10 @@ exports.set = async (uid, t) => {
 };
 
 exports.delete = async (uid) => {
-    await initializePool();
     await pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
 };
 
 exports.all = async () => {
-    await initializePool();
     const {rows} = await pool.query('SELECT uid, access, refresh, exp FROM tokens');
     return Object.fromEntries(rows.map(r => [r.uid, {
         access: r.access,
