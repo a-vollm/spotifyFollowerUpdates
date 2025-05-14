@@ -109,6 +109,7 @@ cron.schedule('*/1 * * * *', async () => {
             });
 
             console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
+            console.log('📦 Aktuelle Subscriptions:', JSON.stringify(subscriptions, null, 2));
             const userSubscriptions = subscriptions.filter(s => s.uid === uid);
             console.log('usersubscribe', userSubscriptions);
             for (const sub of userSubscriptions) {
