@@ -26,6 +26,11 @@ router.get('/auth/spotify', (_, res) => {
 });
 
 router.get('/auth/spotify/callback', async (req, res) => {
+    console.log('[DEBUG] REDIRECT_URI:', REDIRECT_URI);
+    console.log('[DEBUG] SPOTIFY_CLIENT_ID:', SPOTIFY_CLIENT_ID);
+    console.log('[DEBUG] code from query:', req.query.code);
+
+
     const {code, state} = req.query;
 
     const tok = await axios.post(
