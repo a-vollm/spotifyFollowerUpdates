@@ -118,8 +118,12 @@ cron.schedule('*/2 * * * *', async () => {
             }
 
             // 5. Cache aktualisieren
-            await tokenStore.setPlaylistCache(`${playlistId}_${uid}`, [...currentSet]);
-            console.log('✅ Playlist-Cache aktualisiert.');
+            if (added.length > 0 || removed.length > 0) {
+                await tokenStore.setPlaylistCache(`${playlistId}_${uid}`, [...currentSet]);
+                console.log('✅ Playlist-Cache aktualisiert.');
+            } else {
+                console.log('⏩ Keine Änderungen – Cache bleibt unverändert.');
+            }
 
         } catch (err) {
             console.error(`❌ Fehler bei UID ${uid}:`, err.message);
