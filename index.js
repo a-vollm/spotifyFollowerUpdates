@@ -11,10 +11,8 @@ const {initAuth} = require('./auth');
 const {router: apiRouter, subscriptions} = require('./routes');
 const cache = require('./cache');
 const tokenStore = require('./tokenStore');
+const {getPlaylistCache, setPlaylistCache} = require('./tokenStore');
 const io = require('./socket').init(server);
-
-const lastPlaylists = new Map();
-const lastReleases = new Set();
 
 webpush.setVapidDetails(
     'mailto:you@yourmail.com',
@@ -54,10 +52,10 @@ cron.schedule('* * * * *', async () => {
     try {
         const data = await cache.getPlaylistData(playlistId, token);
         const currentSet = getTrackIds(data);
-        const oldSet = lastPlaylists.get(playlistId) || new Set();
+        const oldSet = await getPlaylistCache(playlistId);
 
         const {added, removed} = compareSets(oldSet, currentSet);
-        lastPlaylists.set(playlistId, currentSet);
+        await setPlaylistCache(playlistId, [...currentSet]);
 
         if (added.length === 0 && removed.length === 0) return;
 
@@ -75,13 +73,11 @@ cron.schedule('* * * * *', async () => {
             ? `1 Track wurde entfernt`
             : `${removed.length} Tracks wurden entfernt`;
 
-        const fullText = [added.length ? addText : '', removed.length ? removeText : '']
-            .filter(Boolean)
-            .join(' • ');
+        const fullText = [addText, removeText].filter(Boolean).join(' • ');
 
         const payload = JSON.stringify({
             notification: {
-                title: `🎵 ${data.name}`,
+                title: `${data.name}`,
                 body: fullText,
                 icon: '/assets/icons/icon-192x192.png',
                 badge: '/assets/icons/badge.png',
@@ -103,52 +99,51 @@ cron.schedule('* * * * *', async () => {
 
 cron.schedule('0 * * * *', async () => {
     const allTokens = await tokenStore.all();
-    const tokens = Object.values(allTokens);
-    if (!tokens.length) return;
 
-    const token = tokens[0].access;
+    for (const [uid, token] of Object.entries(allTokens)) {
+        try {
+            const oldSet = await tokenStore.getReleaseCache(uid);
+            await cache.rebuild(uid, token.access);
+            const current = cache.getLatest(uid);
+            const newSet = new Set(current.map(r => r.id));
 
-    const oldSet = new Set(lastReleases);
-    const before = [...oldSet];
+            const added = [...newSet].filter(x => !oldSet.has(x));
+            await tokenStore.setReleaseCache(uid, [...newSet]);
 
-    await cache.rebuild('default', token); // this call will be ignored if UID handling is added
-    const current = cache.getLatest('default');
-    const newSet = new Set(current.map(r => r.id));
+            if (!added.length) continue;
 
-    const added = [...newSet].filter(x => !oldSet.has(x));
-    lastReleases.clear();
-    current.forEach(r => lastReleases.add(r.id));
+            const addedItems = current.filter(r => added.includes(r.id));
+            const albums = addedItems.filter(r => r.album_type === 'album').length;
+            const singles = addedItems.filter(r => r.album_type === 'single').length;
 
-    if (!added.length) return;
+            const summary = [
+                albums ? `${albums} neue Alben` : '',
+                singles ? `${singles} neue Singles` : ''
+            ].filter(Boolean).join(' und ');
 
-    const addedItems = current.filter(r => added.includes(r.id));
-    const albums = addedItems.filter(r => r.album_type === 'album').length;
-    const singles = addedItems.filter(r => r.album_type === 'single').length;
+            const payload = JSON.stringify({
+                notification: {
+                    title: '🎉 Neue Releases entdeckt',
+                    body: summary,
+                    icon: '/assets/icons/icon-192x192.png',
+                    badge: '/assets/icons/badge.png',
+                    tag: 'releases-update',
+                    renotify: true,
+                    requireInteraction: true,
+                    data: {origin: 'release-monitor'}
+                }
+            });
 
-    const summary = [
-        albums ? `${albums} neue Alben` : '',
-        singles ? `${singles} neue Singles` : ''
-    ].filter(Boolean).join(' und ');
-
-    const payload = JSON.stringify({
-        notification: {
-            title: '🎉 Neue Releases entdeckt',
-            body: summary,
-            icon: '/assets/icons/icon-192x192.png',
-            badge: '/assets/icons/badge.png',
-            tag: 'releases-update',
-            renotify: true,
-            requireInteraction: true,
-            data: {origin: 'release-monitor'}
+            for (const sub of subscriptions) {
+                await webpush.sendNotification(sub, payload);
+            }
+        } catch (e) {
+            console.error(`❌ Fehler beim Release-Check für UID ${uid}:`, e.message);
         }
-    });
-
-    for (const sub of subscriptions) {
-        await webpush.sendNotification(sub, payload);
     }
 });
 
-cron.schedule('*/20 * * * *', async () => {
+cron.schedule('*/5 * * * *', async () => {
     const tokens = await tokenStore.all();
     for (const [uid, token] of Object.entries(tokens)) {
         await cache.rebuild(uid, token.access);

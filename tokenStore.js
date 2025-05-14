@@ -28,6 +28,49 @@ exports.set = async (uid, t) => {
     `, [uid, t.access, t.refresh, exp]);
 };
 
+exports.getPlaylistCache = async (playlistId) => {
+    const {rows} = await pool.query(
+        'SELECT track_ids FROM playlist_cache WHERE playlist_id = $1',
+        [playlistId]
+    );
+    return new Set(rows[0]?.track_ids ?? []);
+};
+
+exports.setPlaylistCache = async (playlistId, trackIds) => {
+    await pool.query(`
+        INSERT INTO playlist_cache (playlist_id, track_ids)
+        VALUES ($1, $2) ON CONFLICT (playlist_id) DO
+        UPDATE
+            SET track_ids = EXCLUDED.track_ids
+    `, [playlistId, trackIds]);
+};
+
+exports.getReleaseCache = async (uid) => {
+    const {rows} = await pool.query(
+        'SELECT id FROM release_cache WHERE uid=$1', [uid]
+    );
+    return new Set(rows.map(r => r.id));
+};
+
+exports.setReleaseCache = async (uid, ids) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM release_cache WHERE uid=$1', [uid]);
+        for (const id of ids) {
+            await client.query(
+                'INSERT INTO release_cache (uid, id) VALUES ($1, $2)', [uid, id]
+            );
+        }
+        await client.query('COMMIT');
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+};
+
 
 exports.delete = uid =>
     pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
