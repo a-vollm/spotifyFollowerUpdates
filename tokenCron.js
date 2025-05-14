@@ -13,7 +13,7 @@ cron.schedule('*/10 * * * *', async () => {
     const allTokens = await tokenStore.all();
 
     for (const [userId, token] of Object.entries(allTokens)) {
-        if (token.exp - now < 600) {
+        if (token.exp - now < 1800) {
             try {
                 const res = await axios.post(
                     'https://accounts.spotify.com/api/token',

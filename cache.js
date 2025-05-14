@@ -91,6 +91,11 @@ async function rebuild(uid, token) {
 
     } catch (err) {
         console.error(`[${uid}] Cache rebuild failed:`, err.message);
+        // Bei 401: Token als ungültig markieren
+        if (err.response?.status === 401) {
+            await tokenStore.delete(uid);
+            console.log(`♻️ Token für ${uid} ungültig – bitte neu anmelden.`);
+        }
     } finally {
         cache.status.loading = false;
     }

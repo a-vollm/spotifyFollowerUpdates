@@ -18,6 +18,7 @@ const ensureAuth = async (req, res, next) => {
         return res.status(401).json({error: 'token_missing'});
     }
 
+    console.log(`ℹ️ Token für ${uid} läuft bald ab (${Math.round(token.exp - now)}s)`);
     if (token.exp - now < 30) {
         try {
             const resToken = await axios.post(

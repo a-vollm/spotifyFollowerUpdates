@@ -43,25 +43,39 @@ function compareSets(oldSet, newSet) {
     return {added, removed};
 }
 
-cron.schedule('*/1 * * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
+    console.log('🎧 Starte Playlist-Check...');
     const playlistId = '4QTlILYEMucSKLHptGxjAq';
     const allTokens = await tokenStore.all();
+    console.log(`🔑 Gefundene Benutzer: ${Object.keys(allTokens).length}`);
 
     for (const [uid, token] of Object.entries(allTokens)) {
         try {
+            console.log(`\n--- Prüfe UID ${uid} ---`);
+
+            // 1. Playlist-Daten abrufen
             const data = await cache.getPlaylistData(playlistId, token.access);
+            console.log(`🎵 Playlist "${data.name}" hat ${data.tracks.length} Tracks`);
+
+            // 2. Track-IDs vergleichen
             const currentSet = getTrackIds(data);
             const oldSet = await tokenStore.getPlaylistCache(`${playlistId}_${uid}`);
+            console.log(`🗃️ Alte Tracks: ${oldSet.size}, Aktuelle Tracks: ${currentSet.size}`);
+
             const {added, removed} = compareSets(oldSet, currentSet);
+            console.log(`➕ Hinzugefügt: ${added.length}, ➖ Entfernt: ${removed.length}`);
 
-            await tokenStore.setPlaylistCache(`${playlistId}_${uid}`, [...currentSet]);
+            if (added.length === 0 && removed.length === 0) {
+                console.log('⏩ Keine Änderungen – überspringe.');
+                continue;
+            }
 
-            if (added.length === 0 && removed.length === 0) continue;
-
+            // 3. Benachrichtigung erstellen
             let addedByName = null;
             if (added.length > 0) {
                 const addedTrack = data.tracks.find(t => added.includes(t.track.id));
-                addedByName = addedTrack?.added_by?.display_name || null;
+                addedByName = addedTrack?.added_by?.display_name || "Unbekannt";
+                console.log(`👤 Hinzugefügt von: ${addedByName}`);
             }
 
             const addText = added.length === 1
@@ -88,17 +102,24 @@ cron.schedule('*/1 * * * *', async () => {
                 }
             });
 
+            // 4. Push senden
+            console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
             for (const sub of subscriptions) {
                 await webpush.sendNotification(sub, payload);
             }
+
+            // 5. Cache aktualisieren
+            await tokenStore.setPlaylistCache(`${playlistId}_${uid}`, [...currentSet]);
+            console.log('✅ Playlist-Cache aktualisiert.');
+
         } catch (err) {
-            console.error(`Fehler bei Playlist-Check für UID ${uid}:`, err.message);
+            console.error(`❌ Fehler bei UID ${uid}:`, err.message);
         }
     }
 });
 
 
-cron.schedule('0 * * * *', async () => {
+cron.schedule('*/30 * * * *', async () => {
     const allTokens = await tokenStore.all();
 
     for (const [uid, token] of Object.entries(allTokens)) {
