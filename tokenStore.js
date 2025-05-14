@@ -8,7 +8,7 @@ const pool = new Pool({
     port: 5432,
     ssl: {
         rejectUnauthorized: false,
-        servername: 'db.nnojnnqlolbqovvoetfh.supabase.co' // Erzwingt SSL-SNI
+        servername: 'db.nnojnnqlolbqovvoetfh.supabase.co'
     },
     connectionTimeoutMillis: 10000,
     family: 4 // IPv4 erzwingen
