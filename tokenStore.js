@@ -1,64 +1,50 @@
+// tokenStore.js
 const {Pool} = require('pg');
-const dns = require('dns').promises;
+const dns = require('dns');
+const {hostname} = new URL(process.env.DATABASE_URL);
 
-let pool;
+// ► optional: Cloudflare & Google als Resolver
+dns.setServers(['1.1.1.1', '8.8.8.8']);
+dns.setDefaultResultOrder('ipv4first');
 
-(async () => {
-    // exakt eine IPv4-Adresse ermitteln
-    const {address: ipv4} = await dns.lookup(
-        'db.nnojnnqlolbqovvoetfh.supabase.co',
-        {family: 4}
-    );
+// • erzwinge IPv4 bei jedem Lookup (pg verwendet das callback)
+function ipv4Lookup(host, _opts, cb) {
+    dns.lookup(host, {family: 4}, cb);
+}
 
-    console.log('IPv4 for Supabase:', ipv4);
-
-    pool = new Pool({
-        host: ipv4,                       // <-- direkt die IP
-        user: 'postgres',
-        password: process.env.DATABASE_PASSWORD,
-        database: 'postgres',
-        port: 5432,
-        ssl: {
-            rejectUnauthorized: false,
-            servername: 'db.nnojnnqlolbqovvoetfh.supabase.co'
-        },
-        connectionTimeoutMillis: 10000
-    });
-
-    // erster kurzer Test, damit das Ding steht
-    await pool.query('SELECT 1');
-    console.log('DB ready via IPv4');
-})().catch(err => {
-    console.error('Fatal DB init error:', err);
-    process.exit(1);
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {rejectUnauthorized: false},
+    connectionTimeoutMillis: 10_000,
+    lookup: ipv4Lookup
 });
 
-exports.get = async (uid) => {
-    const {rows} = await pool.query('SELECT access, refresh, exp FROM tokens WHERE uid=$1', [uid]);
-    return rows[0] || null;
+// ————————————————————— CRUD
+exports.get = async uid => {
+    const {rows} = await pool.query(
+        'SELECT access, refresh, exp FROM tokens WHERE uid=$1', [uid]
+    );
+    return rows[0] ?? null;
 };
 
 exports.set = async (uid, t) => {
-    await pool.query(`
-        INSERT INTO tokens (uid, access, refresh, exp)
-        VALUES ($1, $2, $3, $4) ON CONFLICT (uid)
-    DO
-        UPDATE SET access=EXCLUDED.access,
-            refresh=EXCLUDED.refresh,
-            exp=EXCLUDED.exp,
-            updated_at= CURRENT_TIMESTAMP
-    `, [uid, t.access, t.refresh, t.exp]);
+    await pool.query(
+        `INSERT INTO tokens (uid, access, refresh, exp)
+         VALUES ($1, $2, $3, $4) ON CONFLICT (uid) DO
+        UPDATE
+            SET access = EXCLUDED.access,
+            refresh = EXCLUDED.refresh,
+            exp = EXCLUDED.exp,
+            updated_at = CURRENT_TIMESTAMP`,
+        [uid, t.access, t.refresh, t.exp]
+    );
 };
 
-exports.delete = async (uid) => {
-    await pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
-};
+exports.delete = uid =>
+    pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
 
 exports.all = async () => {
-    const {rows} = await pool.query('SELECT uid, access, refresh, exp FROM tokens');
-    return Object.fromEntries(rows.map(r => [r.uid, {
-        access: r.access,
-        refresh: r.refresh,
-        exp: r.exp
-    }]));
+    const {rows} = await pool.query('SELECT uid,access,refresh,exp FROM tokens');
+    return Object.fromEntries(rows.map(r => [r.uid,
+        {access: r.access, refresh: r.refresh, exp: r.exp}]));
 };
