@@ -1,16 +1,52 @@
 const axios = require('axios');
 const tokenStore = require('./tokenStore');
 const SPOTIFY_API = 'https://api.spotify.com/v1';
-const AXIOS_TIMEOUT = 25_000;
+const AXIOS_TIMEOUT = 25000;
+const RATE_LIMIT_DELAY = 1000; // 1 second between batches
+const BATCH_SIZE = 20; // Artists per batch
 
-const api = axios.create({timeout: AXIOS_TIMEOUT});
+const api = axios.create({
+    timeout: AXIOS_TIMEOUT,
+    headers: {'Accept-Encoding': 'gzip,deflate,compress'}
+});
 
-/* -------- Nutzer-spezifischer Cache -------- */
+// Helper function with retry logic
+async function safeApiCall(config, retries = 3) {
+    try {
+        const response = await api(config);
+        return response.data;
+    } catch (error) {
+        if (retries > 0 && error.response?.status === 429) {
+            const backoff = Math.pow(2, 4 - retries) * 1000;
+            console.log(`⏳ Rate limited. Retrying in ${backoff}ms...`);
+            await new Promise(r => setTimeout(r, backoff));
+            return safeApiCall(config, retries - 1);
+        }
+        throw error;
+    }
+}
+
+// Get all paginated data
+async function getAllPages(url, token) {
+    let items = [];
+    while (url) {
+        const data = await safeApiCall({
+            url,
+            headers: {Authorization: `Bearer ${token}`}
+        });
+        items = [...items, ...data.items];
+        url = data.next;
+        await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY));
+    }
+    return items;
+}
+
+// User cache system
 const userCaches = new Map();
 function getCache(uid) {
     if (!userCaches.has(uid)) {
         userCaches.set(uid, {
-            status: {loading: false, totalArtists: 0, doneArtists: 0, last429: 0},
+            status: {loading: false, totalArtists: 0, doneArtists: 0},
             latest: [],
             releases: {}
         });
@@ -18,135 +54,143 @@ function getCache(uid) {
     return userCaches.get(uid);
 }
 
+// Batch artist album requests
+async function getBatchAlbums(artistIds, token) {
+    const params = {ids: artistIds.join(','), include_groups: 'album,single'};
+    const data = await safeApiCall({
+        url: `${SPOTIFY_API}/artists`,
+        params,
+        headers: {Authorization: `Bearer ${token}`}
+    });
+    return data.artists.flatMap(artist => artist.albums?.items || []);
+}
+
 async function rebuild(uid, token) {
     const cache = getCache(uid);
-    if (cache.status.loading || Date.now() - cache.status.last429 < 15 * 60 * 1000) return;
-
-    cache.status = {loading: true, totalArtists: 0, doneArtists: 0, last429: cache.status.last429};
+    cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
     try {
-        const allArtists = [];
-        let url = `${SPOTIFY_API}/me/following?type=artist&limit=50`;
-
-        while (url) {
-            const res = await api.get(url, {headers: {Authorization: `Bearer ${token}`}});
-            allArtists.push(...res.data.artists.items);
-            url = res.data.artists.next;
-        }
-
-        cache.status.totalArtists = allArtists.length;
-        if (allArtists.length === 0) return;
-
-        const allAlbums = [];
-        for (const artist of allArtists) {
-            const r = await api.get(
-                `${SPOTIFY_API}/artists/${artist.id}/albums`,
-                {headers: {Authorization: `Bearer ${token}`}, params: {include_groups: 'album,single', limit: 50}}
-            );
-            allAlbums.push(...r.data.items);
-            cache.status.doneArtists++;
-            await new Promise(r => setTimeout(r, 350));
-        }
-
-        if (allAlbums.length === 0) return;
-
-        const byYear = {};
-        allAlbums.forEach(a => {
-            const d = new Date(a.release_date);
-            const y = d.getFullYear();
-            const m = d.toLocaleString('default', {month: 'long'});
-            (byYear[y] ||= {})[m] ||= [];
-            byYear[y][m].push(a);
-        });
-
-        cache.releases = Object.fromEntries(
-            Object.entries(byYear).map(([y, months]) => [
-                y,
-                Object.entries(months)
-                    .sort(([a], [b]) => new Date(`${b} 1,${y}`) - new Date(`${a} 1,${y}`))
-                    .map(([m, rel]) => ({month: m, releases: rel}))
-            ])
+        // Get followed artists
+        const artists = await getAllPages(
+            `${SPOTIFY_API}/me/following?type=artist&limit=50`,
+            token
         );
+
+        cache.status.totalArtists = artists.length;
+        if (!artists.length) return;
+
+        // Process artists in batches
+        const allAlbums = [];
+        for (let i = 0; i < artists.length; i += BATCH_SIZE) {
+            const batch = artists.slice(i, i + BATCH_SIZE);
+            const batchAlbums = await getBatchAlbums(
+                batch.map(a => a.id),
+                token
+            );
+            allAlbums.push(...batchAlbums);
+            cache.status.doneArtists += batch.length;
+            await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY));
+        }
+
+        if (!allAlbums.length) return;
+
+        // Group releases by year/month
+        const byYear = allAlbums.reduce((acc, album) => {
+            const date = new Date(album.release_date);
+            const year = date.getFullYear();
+            const month = date.toLocaleString('default', {month: 'long'});
+            acc[year] = acc[year] || {};
+            acc[year][month] = [...(acc[year][month] || []), album];
+            return acc;
+        }, {});
+
+        cache.releases = Object.entries(byYear).reduce((acc, [year, months]) => {
+            acc[year] = Object.entries(months)
+                .sort(([a], [b]) => new Date(`${b} 1,${year}`) - new Date(`${a} 1,${year}`))
+                .map(([month, releases]) => ({month, releases}));
+            return acc;
+        }, {});
 
         cache.latest = allAlbums
             .sort((a, b) => new Date(b.release_date) - new Date(a.release_date))
             .slice(0, 20);
 
     } catch (err) {
-        if (err.response?.status === 401) {
-            const saved = await tokenStore.get(uid);
-            if (!saved?.refresh) return;
-            const qs = require('querystring');
-            const resToken = await axios.post(
-                'https://accounts.spotify.com/api/token',
-                qs.stringify({grant_type: 'refresh_token', refresh_token: saved.refresh}),
-                {
-                    headers: {
-                        Authorization: 'Basic ' + Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64'),
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    }
-                }
-            );
-            saved.access = resToken.data.access_token;
-            saved.exp = Date.now() / 1000 + resToken.data.expires_in;
-            if (resToken.data.refresh_token) saved.refresh = resToken.data.refresh_token;
-            await tokenStore.set(uid, saved);
-            return await rebuild(uid, saved.access);
-        }
-
-        if (err.response?.status === 429) {
-            cache.status.last429 = Date.now();
-            return;
-        }
-
-        console.error(`[${uid}] rebuild error:`, err.message);
-
+        console.error(`[${uid}] Rebuild failed:`, err.message);
+        if (err.response?.status === 401) await handleTokenRefresh(uid);
     } finally {
         cache.status.loading = false;
     }
 }
 
+async function handleTokenRefresh(uid) {
+    const saved = await tokenStore.get(uid);
+    if (!saved?.refresh) return;
 
-async function getPlaylistData(playlistId, token) {
-    const urlBase = `${SPOTIFY_API}/playlists/${playlistId}`;
-    const playlist = (await axios.get(urlBase, {headers: {Authorization: `Bearer ${token}`}})).data;
+    try {
+        const {data} = await axios.post('https://accounts.spotify.com/api/token',
+            new URLSearchParams({grant_type: 'refresh_token', refresh_token: saved.refresh}),
+            {
+                headers: {
+                    Authorization: `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
+        );
 
-    let tracks = [];
-    let next = `${urlBase}/tracks?limit=100&offset=0`;
-    while (next) {
-        const r = await axios.get(next, {headers: {Authorization: `Bearer ${token}`}});
-        tracks.push(...r.data.items);
-        next = r.data.next;
+        await tokenStore.set(uid, {
+            access: data.access_token,
+            refresh: data.refresh_token || saved.refresh,
+            exp: Date.now() / 1000 + data.expires_in
+        });
+        console.log(`🔁 Token refreshed for ${uid}`);
+    } catch (error) {
+        console.error(`❌ Token refresh failed for ${uid}:`, error.message);
+        await tokenStore.delete(uid);
     }
-
-    const ids = [...new Set(tracks.map(t => t.added_by?.id).filter(Boolean))];
-    const displayMap = {};
-    for (const id of ids) {
-        try {
-            const u = await axios.get(`${SPOTIFY_API}/users/${id}`, {headers: {Authorization: `Bearer ${token}`}});
-            displayMap[id] = u.data.display_name;
-        } catch {
-            displayMap[id] = null;
-        }
-    }
-    tracks.forEach(t => {
-        const id = t.added_by?.id;
-        if (id && displayMap[id]) t.added_by.display_name = displayMap[id];
-    });
-
-    return {...playlist, tracks};
 }
 
-/* -------- Getter -------- */
-const getCacheStatus = uid => getCache(uid).status;
-const getLatest = uid => getCache(uid).latest;
-const getReleases = (uid, y) => getCache(uid).releases[y] || [];
+async function getPlaylistData(playlistId, token) {
+    try {
+        const [playlist, tracks] = await Promise.all([
+            safeApiCall({url: `${SPOTIFY_API}/playlists/${playlistId}`, headers: {Authorization: `Bearer ${token}`}}),
+            getAllPages(`${SPOTIFY_API}/playlists/${playlistId}/tracks?limit=100`, token)
+        ]);
 
-/* -------- Exporte -------- */
+        // Get unique user IDs in parallel
+        const userIds = [...new Set(tracks.map(t => t.added_by?.id).filter(Boolean))];
+        const users = await Promise.all(
+            userIds.map(id =>
+                safeApiCall({url: `${SPOTIFY_API}/users/${id}`, headers: {Authorization: `Bearer ${token}`}})
+                    .catch(() => null)
+            )
+        );
+
+        const displayNames = users.reduce((acc, user) => {
+            if (user) acc[user.id] = user.display_name;
+            return acc;
+        }, {});
+
+        return {
+            ...playlist,
+            tracks: tracks.map(track => ({
+                ...track,
+                added_by: {
+                    ...track.added_by,
+                    display_name: displayNames[track.added_by?.id] || track.added_by?.display_name
+                }
+            }))
+        };
+    } catch (error) {
+        console.error('Playlist fetch failed:', error.message);
+        throw error;
+    }
+}
+
 module.exports = {
     rebuild,
-    getCacheStatus,
-    getLatest,
-    getReleases,
+    getCacheStatus: uid => getCache(uid).status,
+    getLatest: uid => getCache(uid).latest,
+    getReleases: (uid, year) => getCache(uid).releases[year] || [],
     getPlaylistData
 };
