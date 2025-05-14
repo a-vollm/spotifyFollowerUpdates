@@ -110,9 +110,9 @@ cron.schedule('*/1 * * * *', async () => {
 
             console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
             const userSubscriptions = subscriptions.filter(s => s.uid === uid);
-            console.log('usersubscribe', userSubscriptions)
+            console.log('usersubscribe', userSubscriptions);
             for (const sub of userSubscriptions) {
-                console.log(sub.subscription)
+                console.log(sub.subscription);
                 await webpush.sendNotification(sub.subscription, payload);
             }
 
