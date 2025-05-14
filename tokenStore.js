@@ -1,20 +1,36 @@
 const {Pool} = require('pg');
-const dns = require('dns');
+const dns = require('dns').promises;
 
-dns.setDefaultResultOrder('ipv4first');
+let pool;
 
-const pool = new Pool({
-    host: 'db.nnojnnqlolbqovvoetfh.supabase.co',
-    user: 'postgres',
-    password: process.env.DATABASE_PASSWORD,
-    database: 'postgres',
-    port: 5432,
-    ssl: {
-        rejectUnauthorized: false,
-        servername: 'db.nnojnnqlolbqovvoetfh.supabase.co'
-    },
-    connectionTimeoutMillis: 10000,
-    lookup: (host, opts, cb) => dns.lookup(host, {family: 4}, cb)
+(async () => {
+    // exakt eine IPv4-Adresse ermitteln
+    const {address: ipv4} = await dns.lookup(
+        'db.nnojnnqlolbqovvoetfh.supabase.co',
+        {family: 4}
+    );
+
+    console.log('IPv4 for Supabase:', ipv4);
+
+    pool = new Pool({
+        host: ipv4,                       // <-- direkt die IP
+        user: 'postgres',
+        password: process.env.DATABASE_PASSWORD,
+        database: 'postgres',
+        port: 5432,
+        ssl: {
+            rejectUnauthorized: false,
+            servername: 'db.nnojnnqlolbqovvoetfh.supabase.co'
+        },
+        connectionTimeoutMillis: 10000
+    });
+
+    // erster kurzer Test, damit das Ding steht
+    await pool.query('SELECT 1');
+    console.log('DB ready via IPv4');
+})().catch(err => {
+    console.error('Fatal DB init error:', err);
+    process.exit(1);
 });
 
 exports.get = async (uid) => {
