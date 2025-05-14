@@ -3,15 +3,24 @@ const axios = require('axios');
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const AXIOS_TIMEOUT = 25000;
 
-const cache = {
-    status: {loading: false, totalArtists: 0, doneArtists: 0},
-    latest: [],
-    releases: {}
-};
-
 const api = axios.create({timeout: AXIOS_TIMEOUT});
 
-async function rebuild(token) {
+/* -------- Nutzer-spezifischer Cache -------- */
+const userCaches = new Map();
+
+function getCache(uid) {
+    if (!userCaches.has(uid)) {
+        userCaches.set(uid, {
+            status: {loading: false, totalArtists: 0, doneArtists: 0},
+            latest: [],
+            releases: {}
+        });
+    }
+    return userCaches.get(uid);
+}
+
+async function rebuild(token, uid) {
+    const cache = getCache(uid);
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
     try {
@@ -40,7 +49,6 @@ async function rebuild(token) {
             allAlbums.push(...r.data.items);
             cache.status.doneArtists++;
 
-            // Optional: künstliches Delay zur Visualisierung im Frontend
             await new Promise(res => setTimeout(res, 100));
         }
 
@@ -66,23 +74,19 @@ async function rebuild(token) {
             .sort((a, b) => new Date(b.release_date) - new Date(a.release_date))
             .slice(0, 20);
     } catch (err) {
-        console.error('Cache rebuild failed:', err.message);
+        console.error(`[${uid}] Cache rebuild failed:`, err.message);
     } finally {
         cache.status.loading = false;
     }
 }
 
-
-/* -------- Playlist komplett laden + User-Namen auflösen -------- */
 async function getPlaylistData(playlistId, token) {
     const urlBase = `${SPOTIFY_API}/playlists/${playlistId}`;
 
-    /* Metadaten der Playlist */
     const playlist = (await axios.get(urlBase, {
         headers: {Authorization: `Bearer ${token}`}
     })).data;
 
-    /* Alle Tracks (paging 100er-Blöcke) */
     let tracks = [];
     let next = `${urlBase}/tracks?limit=100&offset=0`;
     while (next) {
@@ -93,7 +97,6 @@ async function getPlaylistData(playlistId, token) {
         next = r.data.next;
     }
 
-    /* Display-Namen der »added_by«-User auflösen (einmal pro ID) */
     const ids = [...new Set(tracks.map(t => t.added_by?.id).filter(Boolean))];
     const displayMap = {};
     for (const id of ids) {
@@ -114,16 +117,16 @@ async function getPlaylistData(playlistId, token) {
     return {...playlist, tracks};
 }
 
-function getCacheStatus() {
-    return cache.status;
+function getCacheStatus(uid) {
+    return getCache(uid).status;
 }
 
-function getLatest() {
-    return cache.latest;
+function getLatest(uid) {
+    return getCache(uid).latest;
 }
 
-function getReleases(year) {
-    return cache.releases[year] || [];
+function getReleases(uid, year) {
+    return getCache(uid).releases[year] || [];
 }
 
 module.exports = {

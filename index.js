@@ -6,38 +6,33 @@ const cron = require('node-cron');
 const webpush = require('web-push');
 
 const app = express();
-require('./tokenCron');
 const server = http.createServer(app);
-
 const {initAuth} = require('./auth');
 const {router: apiRouter, subscriptions} = require('./routes');
+const cache = require('./cache');
+const tokenStore = require('./tokenStore');
 const io = require('./socket').init(server);
+
 const lastPlaylists = new Map();
 const lastReleases = new Set();
 
-// VAPID
 webpush.setVapidDetails(
     'mailto:you@yourmail.com',
     process.env.VAPID_PUBLIC,
     process.env.VAPID_PRIVATE
 );
 
-// CORS & JSON
 app.use(cors({
     origin: process.env.FRONTEND_URI,
+    credentials: true,
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'],
-    credentials: true
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
 }));
 app.use(express.json());
 
-// Auth-Endpoints
 initAuth(app);
-
-// API-Routen
 app.use(apiRouter);
 
-// Socket.IO
 io.on('connection', () => console.log('✅ Socket.IO Client connected'));
 
 function getTrackIds(playlist) {
@@ -52,12 +47,12 @@ function compareSets(oldSet, newSet) {
 
 cron.schedule('* * * * *', async () => {
     const playlistId = '4QTlILYEMucSKLHptGxjAq';
-    const allTokens = await require('./tokenStore').all();
+    const allTokens = await tokenStore.all();
     const token = Object.values(allTokens)[0]?.access;
     if (!token) return;
 
     try {
-        const data = await require('./cache').getPlaylistData(playlistId, token);
+        const data = await cache.getPlaylistData(playlistId, token);
         const currentSet = getTrackIds(data);
         const oldSet = lastPlaylists.get(playlistId) || new Set();
 
@@ -76,11 +71,9 @@ cron.schedule('* * * * *', async () => {
             ? `${addedByName} hat 1 neuen Track hinzugefügt`
             : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`;
 
-
-        const removeText =
-            removed.length === 1
-                ? `1 Track wurde entfernt`
-                : `${removed.length} Tracks wurden entfernt`;
+        const removeText = removed.length === 1
+            ? `1 Track wurde entfernt`
+            : `${removed.length} Tracks wurden entfernt`;
 
         const fullText = [added.length ? addText : '', removed.length ? removeText : '']
             .filter(Boolean)
@@ -96,12 +89,9 @@ cron.schedule('* * * * *', async () => {
                 renotify: true,
                 silent: false,
                 requireInteraction: true,
-                data: {
-                    origin: 'playlist-monitor'
-                }
+                data: {origin: 'playlist-monitor'}
             }
         });
-
 
         for (const sub of subscriptions) {
             await webpush.sendNotification(sub, payload);
@@ -112,20 +102,17 @@ cron.schedule('* * * * *', async () => {
 });
 
 cron.schedule('0 * * * *', async () => {
-    const allTokens = await require('./tokenStore').all();
+    const allTokens = await tokenStore.all();
     const tokens = Object.values(allTokens);
-
     if (!tokens.length) return;
 
     const token = tokens[0].access;
-    const cache = require('./cache');
 
     const oldSet = new Set(lastReleases);
     const before = [...oldSet];
 
-    await cache.rebuild(token);
-
-    const current = cache.getLatest();
+    await cache.rebuild('default', token); // this call will be ignored if UID handling is added
+    const current = cache.getLatest('default');
     const newSet = new Set(current.map(r => r.id));
 
     const added = [...newSet].filter(x => !oldSet.has(x));
@@ -134,7 +121,6 @@ cron.schedule('0 * * * *', async () => {
 
     if (!added.length) return;
 
-    // Analyse Alben/Singles
     const addedItems = current.filter(r => added.includes(r.id));
     const albums = addedItems.filter(r => r.album_type === 'album').length;
     const singles = addedItems.filter(r => r.album_type === 'single').length;
@@ -153,9 +139,7 @@ cron.schedule('0 * * * *', async () => {
             tag: 'releases-update',
             renotify: true,
             requireInteraction: true,
-            data: {
-                origin: 'release-monitor'
-            }
+            data: {origin: 'release-monitor'}
         }
     });
 
@@ -164,6 +148,12 @@ cron.schedule('0 * * * *', async () => {
     }
 });
 
-// Server start
-const PORT = process.env.PORT || 4000;
+cron.schedule('*/20 * * * *', async () => {
+    const tokens = await tokenStore.all();
+    for (const [uid, token] of Object.entries(tokens)) {
+        await cache.rebuild(uid, token.access);
+    }
+});
+
+const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

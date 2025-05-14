@@ -49,26 +49,22 @@ const ensureAuth = async (req, res, next) => {
         }
     }
 
+    req.uid = uid;
     req.token = token.access;
     next();
 };
 
-let initialCacheLoaded = false;
-
 router.get('/cache-status', ensureAuth, async (req, res) => {
-    if (!initialCacheLoaded) {
-        initialCacheLoaded = true;
-        await cache.rebuild(req.token);
-    }
-    res.json(cache.getCacheStatus());
+    await cache.rebuild(req.uid, req.token);
+    res.json(cache.getCacheStatus(req.uid));
 });
 
-router.get('/latest', ensureAuth, (_req, res) => {
-    res.json(cache.getLatest());
+router.get('/latest', ensureAuth, (req, res) => {
+    res.json(cache.getLatest(req.uid));
 });
 
 router.get('/releases/:year', ensureAuth, (req, res) => {
-    const data = cache.getReleases(req.params.year);
+    const data = cache.getReleases(req.uid, req.params.year);
     if (!data.length) return res.status(404).json({error: 'No data yet'});
     res.json(data);
 });
@@ -92,6 +88,5 @@ router.post('/subscribe', (req, res) => {
         res.status(500).json({error: err.message});
     }
 });
-
 
 module.exports = {router, subscriptions};
