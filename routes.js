@@ -110,15 +110,32 @@ router.post('/subscribe', async (req, res) => {
 
 
 router.get('/debug-cache', async (req, res) => {
-    const playlistId = '4QTlILYEMucSKLHptGxjAq';
-    const uid = '1130528843';
-    const dbCache = await getPlaylistCache(playlistId, uid);
-    const currentData = await cache.getPlaylistData(playlistId, sampleToken.access);
+    try {
+        const playlistId = req.query.playlistId || '4QTlILYEMucSKLHptGxjAq'; // Playlist-ID aus Query oder Standardwert
+        const uid = req.query.uid; // UID als Query-Parameter
 
-    res.json({
-        dbCache: [...dbCache],
-        currentTracks: getTrackIds(currentData)
-    });
+        if (!uid) {
+            return res.status(400).json({error: "UID fehlt (Gib ?uid=DEINE_UID an)"});
+        }
+
+        const allTokens = await tokenStore.all();
+        const sampleToken = allTokens[uid];
+        if (!sampleToken) {
+            return res.status(404).json({error: "UID nicht gefunden"});
+        }
+
+        const dbCache = await tokenStore.getPlaylistCache(playlistId, uid);
+        const data = await cache.getPlaylistData(playlistId, sampleToken.access);
+        const currentTracks = getTrackIds(data);
+
+        res.json({
+            dbCache: [...dbCache],
+            currentTracks: [...currentTracks],
+            mismatch: dbCache.size !== currentTracks.size
+        });
+    } catch (err) {
+        res.status(500).json({error: err.message});
+    }
 });
 
 module.exports = {router, subscriptions};
