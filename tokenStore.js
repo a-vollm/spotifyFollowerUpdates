@@ -108,6 +108,16 @@ exports.removeSubscription = async (uid, subscription) => {
     `, [uid, subscription]);
 };
 
+exports.removeAllSubscriptions = async (uid) => {
+    await pool.query('DELETE FROM subscriptions WHERE uid = $1', [uid]);
+};
+
+// Neue Funktion, die alte Subscriptions ersetzt (vorhandene löschen + neue hinzufügen)
+exports.replaceSubscription = async (uid, newSub) => {
+    await this.removeAllSubscriptions(uid);
+    await this.addSubscription(uid, newSub);
+};
+
 exports.delete = uid => pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
 
 exports.all = async () => {

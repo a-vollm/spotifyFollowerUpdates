@@ -98,12 +98,8 @@ router.post('/subscribe', async (req, res) => {
         const uid = req.headers['x-user-id'];
         if (!uid) return res.status(400).json({error: 'missing_uid'});
 
-        const entry = {
-            uid,
-            subscription: req.body
-        };
+        await store.replaceSubscription(uid, req.body);
 
-        await store.addSubscription(uid, req.body);
         res.status(201).json({success: true});
     } catch (err) {
         console.error('Subscription Error:', err.message);
