@@ -3,7 +3,7 @@ const cache = require('./cache');
 const {store} = require('./auth');
 const axios = require('axios');
 const qs = require('querystring');
-const {getPlaylistCache} = require("./tokenStore");
+const tokenStore = require("./tokenStore");
 const router = express.Router();
 const subscriptions = [];
 
