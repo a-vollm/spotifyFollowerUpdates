@@ -100,7 +100,7 @@ cron.schedule('*/1 * * * *', async () => {
                 body: fullText,
                 icon: '/assets/icons/icon-192x192.png',
                 badge: '/assets/icons/badge.png',
-                tag: `playlist-tracking-${uid}`, // Eindeutiges Tag pro Nutzer
+                tag: `playlist-${playlistId}-${currentSet.size}-${uid}`,
                 renotify: true,
                 silent: false,
                 requireInteraction: true,
@@ -110,17 +110,20 @@ cron.schedule('*/1 * * * *', async () => {
 
         console.log(`📤 Sende Benachrichtigung an ${uid}: "${fullText}"`);
 
-        // Nur Subscriptions dieses Nutzers berücksichtigen
         const userSubs = activeSubs.filter(sub => sub.uid === uid);
+        console.log(`🔎 ${uid} hat ${userSubs.length} Subscriptions (${userSubs.map(s => s.subscription.endpoint.slice(0, 15))})`);
         const sent = new Set();
+
         for (const {subscription} of userSubs) {
             const id = subscription.endpoint;
             if (sent.has(id)) continue;
+
             try {
                 await webpush.sendNotification(subscription, payload);
                 sent.add(id);
+                console.log(`📤 Erfolgreich an Endpunkt ${id.slice(0, 15)}... gesendet`);
             } catch (e) {
-                console.warn(`⚠️ Push fehlgeschlagen für ${uid} – lösche Abo …`);
+                console.warn(`⚠️ Push fehlgeschlagen – lösche ${id.slice(0, 15)}...`);
                 await tokenStore.removeSubscription(uid, subscription);
             }
         }

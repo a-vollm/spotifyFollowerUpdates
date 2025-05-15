@@ -108,7 +108,6 @@ exports.removeSubscription = async (uid, subscription) => {
     `, [uid, subscription]);
 };
 
-
 exports.delete = uid => pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
 
 exports.all = async () => {
