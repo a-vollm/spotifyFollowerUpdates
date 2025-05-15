@@ -1,96 +1,50 @@
 const axios = require('axios');
-const pLimit = require('p-limit');
+const tokenStore = require('./tokenStore');
 
 const SPOTIFY_API = 'https://api.spotify.com/v1';
-const AXIOS_TIMEOUT = 60_000;
-const CONCURRENCY = 8;      //  ⬅️  max. parallele API-Calls
+const AXIOS_TIMEOUT = 25000;
+const MAX_FIRST_ARTISTS = 20;
 
-/* ---------- Axios-Instanz mit Basis-URL ---------- */
-const api = axios.create({baseURL: SPOTIFY_API, timeout: AXIOS_TIMEOUT});
+const cache = {
+    status: {loading: false, totalArtists: 0, doneArtists: 0},
+    latest: [],
+    releases: {}
+};
 
-/* ---------- Hilfsfunktionen ---------- */
-const wait = ms => new Promise(r => setTimeout(r, ms));
+const api = axios.create({timeout: AXIOS_TIMEOUT});
 
-async function fetchWithRetry(url, opts = {}, retries = 5) {
-    try {
-        return await api.get(url, opts);
-    } catch (err) {
-        if (err.response?.status === 429 && retries) {
-            const after = (err.response.headers['retry-after'] ?? 1) * 1_000;
-            await wait(after);
-            return fetchWithRetry(url, opts, retries - 1);
-        }
-        throw err;
-    }
-}
-
-/* ---------- Nutzer-spezifischer Cache ---------- */
-const userCaches = new Map();
-function getCache(uid) {
-    if (!userCaches.has(uid)) {
-        userCaches.set(uid, {
-            status: {loading: false, totalArtists: 0, doneArtists: 0, lastError: null},
-            latest: [],
-            releases: {}
-        });
-    }
-    return userCaches.get(uid);
-}
-
-/* ---------- Hauptaufbau ---------- */
-async function rebuild(uid, token) {
-    const cache = getCache(uid);
-    const headers = {Authorization: `Bearer ${token}`};
-
-    cache.status = {loading: true, totalArtists: 0, doneArtists: 0, lastError: null};
+async function rebuild(token) {
+    cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
     try {
-        /* --- Gefolgte Artists holen (kann mehrere Seiten haben) --- */
         const allArtists = [];
-        let url = `/me/following?type=artist&limit=50`;
+        let url = `${SPOTIFY_API}/me/following?type=artist&limit=50`;
 
         while (url) {
-            const res = await fetchWithRetry(url, {headers});
+            const res = await api.get(url, {
+                headers: {Authorization: `Bearer ${token}`}
+            });
             allArtists.push(...res.data.artists.items);
-            url = res.data.artists.next;   // vollqualifizierter Link oder null
+            url = res.data.artists.next;
         }
-        cache.status.totalArtists = allArtists.length;
 
-        /* --- Releases parallel, aber limitiert abholen --- */
-        const limit = pLimit(CONCURRENCY);
-        let done = 0;
-        const albums = [];
+        const ids = allArtists.map(a => a.id);
+        cache.status.totalArtists = ids.length;
 
-        await Promise.all(
-            allArtists.map(artist =>
-                limit(async () => {
-                    try {
-                        const r = await fetchWithRetry(
-                            `/artists/${artist.id}/albums`,
-                            {
-                                headers,
-                                params: {
-                                    include_groups: 'album,single',
-                                    limit: 50,
-                                    market: 'from_token'
-                                }
-                            }
-                        );
-                        albums.push(...r.data.items);
-                    } catch (err) {
-                        console.error(`[${uid}] Fehler bei Artist ${artist.name}:`, err.message);
-                    } finally {
-                        cache.status.doneArtists = ++done;
-                    }
-                })
-            )
-        );
+        const allAlbums = [];
+        for (const id of ids) {
+            const r = await api.get(`${SPOTIFY_API}/artists/${id}/albums`, {
+                headers: {Authorization: `Bearer ${token}`},
+                params: {include_groups: 'album,single', limit: 50}
+            });
+            allAlbums.push(...r.data.items);
+            cache.status.doneArtists++;
+        }
 
-        /* --- Gruppieren nach Jahr / Monat --- */
         const byYear = {};
-        albums.forEach(a => {
+        allAlbums.forEach(a => {
             const d = new Date(a.release_date);
-            const y = d.getUTCFullYear();
+            const y = d.getFullYear();
             const m = d.toLocaleString('default', {month: 'long'});
             (byYear[y] ||= {})[m] ||= [];
             byYear[y][m].push(a);
@@ -105,38 +59,44 @@ async function rebuild(uid, token) {
             ])
         );
 
-        cache.latest = albums
+        cache.latest = allAlbums
             .sort((a, b) => new Date(b.release_date) - new Date(a.release_date))
             .slice(0, 20);
-
     } catch (err) {
-        console.error(`[${uid}] Cache rebuild failed:`, err.message);
-        cache.status.lastError = err.message;
+        console.error('Cache rebuild failed:', err.message);
     } finally {
         cache.status.loading = false;
     }
 }
 
-/* ---------- Playlist-Helfer (unverändert, aber mit Retry) ---------- */
+/* -------- Playlist komplett laden + User-Namen auflösen -------- */
 async function getPlaylistData(playlistId, token) {
-    const headers = {Authorization: `Bearer ${token}`};
-    const urlBase = `/playlists/${playlistId}`;
+    const urlBase = `${SPOTIFY_API}/playlists/${playlistId}`;
 
-    const playlist = (await fetchWithRetry(urlBase, {headers})).data;
+    /* Metadaten der Playlist */
+    const playlist = (await axios.get(urlBase, {
+        headers: {Authorization: `Bearer ${token}`}
+    })).data;
 
+    /* Alle Tracks (paging 100er-Blöcke) */
     let tracks = [];
     let next = `${urlBase}/tracks?limit=100&offset=0`;
     while (next) {
-        const r = await fetchWithRetry(next, {headers});
+        const r = await axios.get(next, {
+            headers: {Authorization: `Bearer ${token}`}
+        });
         tracks.push(...r.data.items);
         next = r.data.next;
     }
 
+    /* Display-Namen der »added_by«-User auflösen (einmal pro ID) */
     const ids = [...new Set(tracks.map(t => t.added_by?.id).filter(Boolean))];
     const displayMap = {};
     for (const id of ids) {
         try {
-            const u = await fetchWithRetry(`/users/${id}`, {headers});
+            const u = await axios.get(`${SPOTIFY_API_BASE}/users/${id}`, {
+                headers: {Authorization: `Bearer ${getAccessToken()}`}
+            });
             displayMap[id] = u.data.display_name;
         } catch {
             displayMap[id] = null;
@@ -150,12 +110,18 @@ async function getPlaylistData(playlistId, token) {
     return {...playlist, tracks};
 }
 
-/* ---------- Getter ---------- */
-const getCacheStatus = uid => getCache(uid).status;
-const getLatest = uid => getCache(uid).latest;
-const getReleases = (uid, y) => getCache(uid).releases[y] || [];
+function getCacheStatus() {
+    return cache.status;
+}
 
-/* ---------- Exporte ---------- */
+function getLatest() {
+    return cache.latest;
+}
+
+function getReleases(year) {
+    return cache.releases[year] || [];
+}
+
 module.exports = {
     rebuild,
     getCacheStatus,
