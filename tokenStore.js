@@ -15,35 +15,32 @@ exports.get = async uid => {
     return rows[0] ?? null;
 };
 
-exports.set = async (uid, t) => {
-    const exp = Math.floor(t.exp); // PostgreSQL erwartet BIGINT
+exports.setPlaylistCache = async (playlistId, uid, trackIds) => {
     await pool.query(`
-        INSERT INTO tokens (uid, access, refresh, exp)
-        VALUES ($1, $2, $3, $4) ON CONFLICT (uid) DO
+        INSERT INTO playlist_cache (playlist_id, uid, track_ids)
+        VALUES ($1, $2, $3) ON CONFLICT (playlist_id, uid) DO
         UPDATE
-            SET access = EXCLUDED.access,
-            refresh = EXCLUDED.refresh,
-            exp = EXCLUDED.exp,
-            updated_at = CURRENT_TIMESTAMP
-    `, [uid, t.access, t.refresh, exp]);
+            SET track_ids = EXCLUDED.track_ids
+    `, [playlistId, uid, trackIds]);
 };
 
-exports.getPlaylistCache = async (playlistId) => {
+
+exports.getPlaylistCache = async (playlistId, uid) => {
     const {rows} = await pool.query(
-        'SELECT track_ids FROM playlist_cache WHERE playlist_id = $1',
-        [playlistId]
+        'SELECT track_ids FROM playlist_cache WHERE playlist_id = $1 AND uid = $2',
+        [playlistId, uid]
     );
     return new Set(rows[0]?.track_ids ?? []);
 };
 
-exports.setPlaylistCache = async (playlistId, trackIds) => {
-    await pool.query(`
-        INSERT INTO playlist_cache (playlist_id, track_ids)
-        VALUES ($1, $2) ON CONFLICT (playlist_id) DO
-        UPDATE
-            SET track_ids = EXCLUDED.track_ids
-    `, [playlistId, trackIds]);
+exports.getPlaylistCache = async (playlistId, uid) => {
+    const {rows} = await pool.query(
+        'SELECT track_ids FROM playlist_cache WHERE playlist_id = $1 AND uid = $2',
+        [playlistId, uid]
+    );
+    return new Set(rows[0]?.track_ids ?? []);
 };
+
 
 exports.getReleaseCache = async (uid) => {
     const {rows} = await pool.query(

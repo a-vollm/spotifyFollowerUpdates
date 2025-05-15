@@ -65,7 +65,7 @@ cron.schedule('*/1 * * * *', async () => {
 
     // Vergleiche mit einem Benutzer (z. B. erstem)
     const firstUid = Object.keys(allTokens)[0];
-    const oldSet = await tokenStore.getPlaylistCache(`${playlistId}_${firstUid}`);
+    const oldSet = await tokenStore.getPlaylistCache(playlistId, firstUid);
     const {added, removed} = compareSets(oldSet, currentSet);
 
     if (added.length === 0 && removed.length === 0) {
@@ -121,8 +121,7 @@ cron.schedule('*/1 * * * *', async () => {
     }
 
     for (const uid of Object.keys(allTokens)) {
-        const cacheKey = `${playlistId}_${uid}`;
-        await tokenStore.setPlaylistCache(cacheKey, [...currentSet]);
+        await tokenStore.setPlaylistCache(playlistId, uid, [...currentSet]);
         console.log(`✅ Cache für ${uid} aktualisiert`);
     }
 });
