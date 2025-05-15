@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 const SPOTIFY_API = 'https://api.spotify.com/v1';
-const AXIOS_TIMEOUT = 25_000;
+const AXIOS_TIMEOUT = 60_000;
 
 const api = axios.create({timeout: AXIOS_TIMEOUT});
 
@@ -10,7 +10,7 @@ const userCaches = new Map();
 function getCache(uid) {
     if (!userCaches.has(uid)) {
         userCaches.set(uid, {
-            status: {loading: false, totalArtists: 0, doneArtists: 0},
+            status: {loading: false, totalArtists: 0, doneArtists: 0, lastError: null},
             latest: [],
             releases: {}
         });
@@ -18,7 +18,6 @@ function getCache(uid) {
     return userCaches.get(uid);
 }
 
-/* ----------  HIER: Reihenfolge uid, token  ---------- */
 async function rebuild(uid, token) {
     const cache = getCache(uid);
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
@@ -38,17 +37,21 @@ async function rebuild(uid, token) {
 
         /* ---------- Releases holen ---------- */
         const allAlbums = [];
-        for (const artist of allArtists) {
-            const r = await api.get(
-                `${SPOTIFY_API}/artists/${artist.id}/albums`,
-                {
-                    headers: {Authorization: `Bearer ${token}`},
-                    params: {include_groups: 'album,single', limit: 50}
-                }
-            );
-            allAlbums.push(...r.data.items);
-            cache.status.doneArtists++;
-            await new Promise(res => setTimeout(res, 100));      // nur für UI-Progress
+        for (const [index, artist] of allArtists.entries()) {
+            try {
+                const r = await api.get(
+                    `${SPOTIFY_API}/artists/${artist.id}/albums`,
+                    {
+                        headers: {Authorization: `Bearer ${token}`},
+                        params: {include_groups: 'album,single', limit: 50}
+                    }
+                );
+                allAlbums.push(...r.data.items);
+            } catch (err) {
+                console.error(`[${uid}] Fehler bei Artist ${artist.name}:`, err.message);
+            }
+            cache.status.doneArtists = index + 1;  // Fortschritt aktualisieren
+            await new Promise(res => setTimeout(res, 100));
         }
 
         /* ---------- Gruppieren nach Jahr/Monat ---------- */
