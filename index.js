@@ -121,7 +121,6 @@ cron.schedule('*/1 * * * *', async () => {
 
             console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
             for (const sub of activeSubs) {
-                console.log(sub.subscription);
                 await webpush.sendNotification(sub.subscription, payload);
             }
 
@@ -182,8 +181,6 @@ cron.schedule('*/30 * * * *', async () => {
                 }
             });
 
-
-            console.log('📦 Aktuelle Subscriptions:', JSON.stringify(activeSubs, null, 2));
             for (const sub of activeSubs) {
                 await webpush.sendNotification(sub.subscription, payload);
             }
