@@ -104,7 +104,7 @@ router.post('/subscribe', (req, res) => {
 
         const exists = subscriptions.find(s => JSON.stringify(s) === JSON.stringify(entry));
         if (!exists) subscriptions.push(entry);
-
+        console.log(subscriptions)
         res.status(201).json({success: true});
     } catch (err) {
         console.error('Subscription Error:', err.message);
