@@ -93,7 +93,7 @@ router.get('/playlist/:id', ensureAuth, async (req, res) => {
     }
 });
 
-router.post('/subscribe', (req, res) => {
+router.post('/subscribe', async (req, res) => {
     try {
         const uid = req.headers['x-user-id'];
         if (!uid) return res.status(400).json({error: 'missing_uid'});
@@ -103,9 +103,7 @@ router.post('/subscribe', (req, res) => {
             subscription: req.body
         };
 
-        const exists = subscriptions.find(s => JSON.stringify(s) === JSON.stringify(entry));
-        if (!exists) subscriptions.push(entry);
-        console.log(subscriptions)
+        await store.addSubscription(uid, req.body);
         res.status(201).json({success: true});
     } catch (err) {
         console.error('Subscription Error:', err.message);

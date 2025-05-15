@@ -71,9 +71,35 @@ exports.setReleaseCache = async (uid, ids) => {
     }
 };
 
+// hole alle Subscriptions
+exports.getAllSubscriptions = async () => {
+    const {rows} = await pool.query('SELECT uid, subscription FROM subscriptions');
+    return rows.map(r => ({
+        uid: r.uid,
+        subscription: r.subscription
+    }));
+};
 
-exports.delete = uid =>
-    pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
+// neue Subscription hinzufügen (verhindert Duplikate)
+exports.addSubscription = async (uid, subscription) => {
+    await pool.query(`
+        INSERT INTO subscriptions (uid, subscription)
+        VALUES ($1, $2) ON CONFLICT DO NOTHING
+    `, [uid, subscription]);
+};
+
+// optional: Subscription löschen (z.B. wenn Push fehlschlägt)
+exports.removeSubscription = async (uid, subscription) => {
+    await pool.query(`
+        DELETE
+        FROM subscriptions
+        WHERE uid = $1
+          AND subscription = $2
+    `, [uid, subscription]);
+};
+
+
+exports.delete = uid => pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
 
 exports.all = async () => {
     const {rows} = await pool.query(

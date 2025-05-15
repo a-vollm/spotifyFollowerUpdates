@@ -8,9 +8,9 @@ const webpush = require('web-push');
 const app = express();
 const server = http.createServer(app);
 const {initAuth} = require('./auth');
-const {router: apiRouter, subscriptions} = require('./routes');
-const cache = require('./cache');
+const {router: apiRouter} = require('./routes');
 const tokenStore = require('./tokenStore');
+const cache = require('./cache');
 const io = require('./socket').init(server);
 
 webpush.setVapidDetails(
@@ -31,6 +31,15 @@ initAuth(app);
 app.use(apiRouter);
 
 io.on('connection', () => console.log('✅ Socket.IO Client connected'));
+
+let subscriptions = [];
+
+async function loadSubscriptions() {
+    subscriptions = await tokenStore.getAllSubscriptions();
+    console.log(`✅ Geladene Subscriptions: ${subscriptions.length}`);
+}
+
+loadSubscriptions();
 
 function getTrackIds(playlist) {
     return new Set(playlist.tracks.map(t => t.track.id));
@@ -109,10 +118,10 @@ cron.schedule('*/1 * * * *', async () => {
             });
 
             console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
-            console.log('📦 Aktuelle Subscriptions:', JSON.stringify(subscriptions, null, 2));
-            const userSubscriptions = subscriptions.filter(s => s.uid === uid);
-            console.log('usersubscribe', userSubscriptions);
-            for (const sub of userSubscriptions) {
+
+            const activeSubs = await tokenStore.getAllSubscriptions();
+            console.log('📦 Aktuelle Subscriptions:', JSON.stringify(activeSubs, null, 2));
+            for (const sub of activeSubs) {
                 console.log(sub.subscription);
                 await webpush.sendNotification(sub.subscription, payload);
             }
@@ -173,8 +182,10 @@ cron.schedule('*/30 * * * *', async () => {
                 }
             });
 
-            for (const sub of subscriptions) {
-                await webpush.sendNotification(sub, payload);
+            const activeSubs = await tokenStore.getAllSubscriptions();
+            console.log('📦 Aktuelle Subscriptions:', JSON.stringify(activeSubs, null, 2));
+            for (const sub of activeSubs) {
+                await webpush.sendNotification(sub.subscription, payload);
             }
         } catch (e) {
             console.error(`❌ Fehler beim Release-Check für UID ${uid}:`, e.message);
