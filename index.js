@@ -71,82 +71,90 @@ cron.schedule('*/1 * * * *', async () => {
 
         console.log(`📀 Playlist "${data.name}" hat ${currentSet.size} Tracks`);
 
-    // Für jeden Nutzer individuell prüfen
-    for (const [uid, token] of Object.entries(allTokens)) {
-        const oldSet = await tokenStore.getPlaylistCache(playlistId, uid);
-        const {added, removed} = compareSets(oldSet, currentSet);
+        // Für jeden Nutzer individuell prüfen
+        for (const [uid, token] of Object.entries(allTokens)) {
+            const oldSet = await tokenStore.getPlaylistCache(playlistId, uid);
+            const {added, removed} = compareSets(oldSet, currentSet);
 
-        if (added.length === 0 && removed.length === 0) {
-            console.log(`⏩ Keine Änderungen für ${uid} – überspringe.`);
-            continue;
-        }
-
-        // Nachricht für diesen Nutzer generieren
-        let addedByName = null;
-        const sampleTrack = data.tracks.find(t => t && currentSet.has(t.track.id));
-        if (sampleTrack?.added_by?.display_name) {
-            addedByName = sampleTrack.added_by.display_name;
-        }
-
-        const parts = [];
-        added.length > 0
-            ? parts.push(added.length === 1
-                ? `${addedByName} hat 1 neuen Track hinzugefügt`
-                : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`)
-            : null;
-
-        removed.length > 0
-            ? parts.push(removed.length === 1
-                ? `1 Track wurde entfernt`
-                : `${removed.length} Tracks wurden entfernt`)
-            : null;
-
-        const fullText = parts.join(' • ');
-        const notificationTag = `playlist-${playlistId}-${Date.now()}-${uid}`;
-        const payload = JSON.stringify({
-            notification: {
-                title: `${data.name}`,
-                body: fullText,
-                icon: '/assets/icons/icon-192x192.png',
-                badge: '/assets/icons/badge.png',
-                tag: notificationTag,
-                renotify: false,
-                silent: false,
-                requireInteraction: true,
-                data: {origin: 'playlist-monitor'}
+            if (added.length === 0 && removed.length === 0) {
+                console.log(`⏩ Keine Änderungen für ${uid} – überspringe.`);
+                continue;
             }
-        });
 
-        console.log(`📤 Sende Benachrichtigung an ${uid}: "${fullText}"`);
+            // Nachricht für diesen Nutzer generieren
+            let addedByName = null;
+            const sampleTrack = data.tracks.find(t => t && currentSet.has(t.track.id));
+            if (sampleTrack?.added_by?.display_name) {
+                addedByName = sampleTrack.added_by.display_name;
+            }
 
-        const userSubs = activeSubs.filter(sub => sub.uid === uid);
-        const sent = new Set();
+            const parts = [];
+            added.length > 0
+                ? parts.push(added.length === 1
+                    ? `${addedByName} hat 1 neuen Track hinzugefügt`
+                    : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`)
+                : null;
 
-        for (const {subscription} of userSubs) {
-            const id = subscription.endpoint;
-            if (sent.has(id)) continue;
+            removed.length > 0
+                ? parts.push(removed.length === 1
+                    ? `1 Track wurde entfernt`
+                    : `${removed.length} Tracks wurden entfernt`)
+                : null;
 
-            try {
-                await webpush.sendNotification(subscription, payload);
-                sent.add(id);
-                console.log(`📤 Erfolgreich an ${id.slice(0, 15)}... gesendet`);
-            } catch (e) {
-                console.warn(`⚠️ Push fehlgeschlagen – lösche ${id.slice(0, 15)}...`);
-                await tokenStore.removeSubscription(uid, subscription);
+            const fullText = parts.join(' • ');
+            const notificationTag = `playlist-${playlistId}-${Date.now()}-${uid}`;
+            const payload = JSON.stringify({
+                notification: {
+                    title: `${data.name}`,
+                    body: fullText,
+                    icon: '/assets/icons/icon-192x192.png',
+                    badge: '/assets/icons/badge.png',
+                    tag: notificationTag,
+                    renotify: false,
+                    silent: false,
+                    requireInteraction: true,
+                    data: {origin: 'playlist-monitor'}
+                }
+            });
+
+            console.log(`📤 Sende Benachrichtigung an ${uid}: "${fullText}"`);
+
+            const userSubs = activeSubs.filter(sub => sub.uid === uid);
+            const sent = new Set();
+
+            for (const {subscription} of userSubs) {
+                const id = subscription.endpoint;
+                if (sent.has(id)) continue;
+
+                try {
+                    await webpush.sendNotification(subscription, payload);
+                    sent.add(id);
+                    console.log(`📤 Erfolgreich an ${id.slice(0, 15)}... gesendet`);
+                } catch (e) {
+                    console.warn(`⚠️ Push fehlgeschlagen – lösche ${id.slice(0, 15)}...`);
+                    await tokenStore.removeSubscription(uid, subscription);
+                }
             }
         }
-    }
     } catch (e) {
         console.error('❌ Cron-Job Fehler:', e);
     } finally {
         isJobRunning = false; // Lock immer zurücksetzen
+    }
+
+    if (added.length > 0 || removed.length > 0) {
+        // 🔽 Cache ZUERST aktualisieren
+        await tokenStore.setPlaylistCache(playlistId, uid, [...currentSet]);
+
+        // ... Benachrichtigung generieren und senden ...
+        console.log(`✅ Cache für ${uid} aktualisiert`);
     }
 });
 
 cron.schedule('*/30 * * * *', async () => {
     const allTokens = await tokenStore.all();
     const activeSubs = await tokenStore.getAllSubscriptions();
-
+    console.log('ACTIVE SUBSCRIPTIONS', activeSubs);
     for (const [uid, token] of Object.entries(allTokens)) {
         try {
             const oldSet = await tokenStore.getReleaseCache(uid);
