@@ -3,6 +3,7 @@ const cache = require('./cache');
 const {store} = require('./auth');
 const axios = require('axios');
 const qs = require('querystring');
+const {getPlaylistCache} = require("./tokenStore");
 const router = express.Router();
 const subscriptions = [];
 
@@ -107,5 +108,17 @@ router.post('/subscribe', async (req, res) => {
     }
 });
 
+
+router.get('/debug-cache', async (req, res) => {
+    const playlistId = '4QTlILYEMucSKLHptGxjAq';
+    const uid = '1130528843';
+    const dbCache = await getPlaylistCache(playlistId, uid);
+    const currentData = await cache.getPlaylistData(playlistId, sampleToken.access);
+
+    res.json({
+        dbCache: [...dbCache],
+        currentTracks: getTrackIds(currentData)
+    });
+});
 
 module.exports = {router, subscriptions};

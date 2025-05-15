@@ -13,6 +13,7 @@ const cache = require('./cache');
 const io = require('./socket').init(server);
 
 let subscriptions = [];
+let isJobRunning = false;
 
 webpush.setVapidDetails(
     'mailto:you@yourmail.com',
@@ -51,17 +52,24 @@ function compareSets(oldSet, newSet) {
 }
 
 cron.schedule('*/1 * * * *', async () => {
-    const playlistId = '4QTlILYEMucSKLHptGxjAq';
-    const allTokens = await tokenStore.all();
-    const activeSubs = await tokenStore.getAllSubscriptions();
+    if (isJobRunning) {
+        console.log('⏭️ Cron-Job übersprungen (bereits aktiv)');
+        return;
+    }
+    isJobRunning = true;
 
-    if (Object.keys(allTokens).length === 0) return;
+    try {
+        const playlistId = '4QTlILYEMucSKLHptGxjAq';
+        const allTokens = await tokenStore.all();
+        const activeSubs = await tokenStore.getAllSubscriptions();
 
-    const sampleToken = Object.values(allTokens)[0];
-    const data = await cache.getPlaylistData(playlistId, sampleToken.access);
-    const currentSet = getTrackIds(data);
+        if (Object.keys(allTokens).length === 0) return;
 
-    console.log(`📀 Playlist "${data.name}" hat ${currentSet.size} Tracks`);
+        const sampleToken = Object.values(allTokens)[0];
+        const data = await cache.getPlaylistData(playlistId, sampleToken.access);
+        const currentSet = getTrackIds(data);
+
+        console.log(`📀 Playlist "${data.name}" hat ${currentSet.size} Tracks`);
 
     // Für jeden Nutzer individuell prüfen
     for (const [uid, token] of Object.entries(allTokens)) {
@@ -94,14 +102,15 @@ cron.schedule('*/1 * * * *', async () => {
             : null;
 
         const fullText = parts.join(' • ');
+        const notificationTag = `playlist-${playlistId}-${Date.now()}-${uid}`;
         const payload = JSON.stringify({
             notification: {
                 title: `${data.name}`,
                 body: fullText,
                 icon: '/assets/icons/icon-192x192.png',
                 badge: '/assets/icons/badge.png',
-                tag: `playlist-${playlistId}-${currentSet.size}-${uid}`,
-                renotify: true,
+                tag: notificationTag,
+                renotify: false,
                 silent: false,
                 requireInteraction: true,
                 data: {origin: 'playlist-monitor'}
@@ -111,7 +120,6 @@ cron.schedule('*/1 * * * *', async () => {
         console.log(`📤 Sende Benachrichtigung an ${uid}: "${fullText}"`);
 
         const userSubs = activeSubs.filter(sub => sub.uid === uid);
-        console.log(`🔎 ${uid} hat ${userSubs.length} Subscriptions (${userSubs.map(s => s.subscription.endpoint.slice(0, 15))})`);
         const sent = new Set();
 
         for (const {subscription} of userSubs) {
@@ -121,23 +129,24 @@ cron.schedule('*/1 * * * *', async () => {
             try {
                 await webpush.sendNotification(subscription, payload);
                 sent.add(id);
-                console.log(`📤 Erfolgreich an Endpunkt ${id.slice(0, 15)}... gesendet`);
+                console.log(`📤 Erfolgreich an ${id.slice(0, 15)}... gesendet`);
             } catch (e) {
                 console.warn(`⚠️ Push fehlgeschlagen – lösche ${id.slice(0, 15)}...`);
                 await tokenStore.removeSubscription(uid, subscription);
             }
         }
-
-        // Cache für diesen Nutzer aktualisieren
-        await tokenStore.setPlaylistCache(playlistId, uid, [...currentSet]);
-        console.log(`✅ Cache für ${uid} aktualisiert`);
+    }
+    } catch (e) {
+        console.error('❌ Cron-Job Fehler:', e);
+    } finally {
+        isJobRunning = false; // Lock immer zurücksetzen
     }
 });
 
 cron.schedule('*/30 * * * *', async () => {
     const allTokens = await tokenStore.all();
     const activeSubs = await tokenStore.getAllSubscriptions();
-    console.log('ACTIVE SUBSCRIPTIONS', activeSubs);
+
     for (const [uid, token] of Object.entries(allTokens)) {
         try {
             const oldSet = await tokenStore.getReleaseCache(uid);

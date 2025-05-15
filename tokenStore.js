@@ -46,15 +46,6 @@ exports.getPlaylistCache = async (playlistId, uid) => {
     return new Set(rows[0]?.track_ids ?? []);
 };
 
-exports.getPlaylistCache = async (playlistId, uid) => {
-    const {rows} = await pool.query(
-        'SELECT track_ids FROM playlist_cache WHERE playlist_id = $1 AND uid = $2',
-        [playlistId, uid]
-    );
-    return new Set(rows[0]?.track_ids ?? []);
-};
-
-
 exports.getReleaseCache = async (uid) => {
     const {rows} = await pool.query(
         'SELECT id FROM release_cache WHERE uid=$1', [uid]
@@ -81,7 +72,6 @@ exports.setReleaseCache = async (uid, ids) => {
     }
 };
 
-// hole alle Subscriptions
 exports.getAllSubscriptions = async () => {
     const {rows} = await pool.query('SELECT uid, subscription FROM subscriptions');
     return rows.map(r => ({
@@ -90,7 +80,7 @@ exports.getAllSubscriptions = async () => {
     }));
 };
 
-// neue Subscription hinzufügen (verhindert Duplikate)
+
 exports.addSubscription = async (uid, subscription) => {
     await pool.query(`
         INSERT INTO subscriptions (uid, subscription)
@@ -98,7 +88,6 @@ exports.addSubscription = async (uid, subscription) => {
     `, [uid, subscription]);
 };
 
-// optional: Subscription löschen (z.B. wenn Push fehlschlägt)
 exports.removeSubscription = async (uid, subscription) => {
     await pool.query(`
         DELETE
@@ -112,7 +101,6 @@ exports.removeAllSubscriptions = async (uid) => {
     await pool.query('DELETE FROM subscriptions WHERE uid = $1', [uid]);
 };
 
-// Neue Funktion, die alte Subscriptions ersetzt (vorhandene löschen + neue hinzufügen)
 exports.replaceSubscription = async (uid, newSub) => {
     await this.removeAllSubscriptions(uid);
     await this.addSubscription(uid, newSub);
