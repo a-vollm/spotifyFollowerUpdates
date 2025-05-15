@@ -183,7 +183,7 @@ cron.schedule('*/30 * * * *', async () => {
                 }
             });
 
-            const activeSubs = await tokenStore.getAllSubscriptions();
+
             console.log('📦 Aktuelle Subscriptions:', JSON.stringify(activeSubs, null, 2));
             for (const sub of activeSubs) {
                 await webpush.sendNotification(sub.subscription, payload);
