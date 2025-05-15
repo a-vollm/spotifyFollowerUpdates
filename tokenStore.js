@@ -28,21 +28,20 @@ exports.set = async (uid, t) => {
     `, [uid, t.access, t.refresh, exp]);
 };
 
-exports.getPlaylistCache = async (playlistId) => {
+exports.getPlaylistCache = async (playlistId, uid) => {
     const {rows} = await pool.query(
-        'SELECT track_ids FROM playlist_cache WHERE playlist_id = $1',
-        [playlistId]
+        'SELECT track_ids FROM playlist_cache WHERE playlist_id = $1 AND uid = $2',
+        [playlistId, uid]
     );
     return new Set(rows[0]?.track_ids ?? []);
 };
 
-exports.setPlaylistCache = async (playlistId, trackIds) => {
+exports.setPlaylistCache = async (playlistId, uid, trackIds) => {
     await pool.query(`
-        INSERT INTO playlist_cache (playlist_id, track_ids)
-        VALUES ($1, $2) ON CONFLICT (playlist_id) DO
-        UPDATE
-            SET track_ids = EXCLUDED.track_ids
-    `, [playlistId, trackIds]);
+        INSERT INTO playlist_cache (playlist_id, uid, track_ids)
+        VALUES ($1, $2, $3) ON CONFLICT (playlist_id, uid) DO
+        UPDATE SET track_ids = EXCLUDED.track_ids
+    `, [playlistId, uid, trackIds]);
 };
 
 exports.getReleaseCache = async (uid) => {
