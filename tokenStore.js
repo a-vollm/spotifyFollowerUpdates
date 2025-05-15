@@ -28,20 +28,10 @@ exports.set = async (uid, t) => {
     `, [uid, t.access, t.refresh, exp]);
 };
 
-exports.setPlaylistCache = async (playlistId, uid, trackIds) => {
-    await pool.query(`
-        INSERT INTO playlist_cache (playlist_id, uid, track_ids)
-        VALUES ($1, $2, $3) ON CONFLICT (playlist_id, uid) DO
-        UPDATE
-            SET track_ids = EXCLUDED.track_ids
-    `, [playlistId, uid, trackIds]);
-};
-
-
-exports.getPlaylistCache = async (playlistId, uid) => {
+exports.getPlaylistCache = async (playlistId) => {
     const {rows} = await pool.query(
-        'SELECT track_ids FROM playlist_cache WHERE playlist_id = $1 AND uid = $2',
-        [playlistId, uid]
+        'SELECT track_ids FROM playlist_cache WHERE playlist_id = $1',
+        [playlistId]
     );
     return new Set(rows[0]?.track_ids ?? []);
 };
@@ -72,6 +62,7 @@ exports.setReleaseCache = async (uid, ids) => {
     }
 };
 
+// hole alle Subscriptions
 exports.getAllSubscriptions = async () => {
     const {rows} = await pool.query('SELECT uid, subscription FROM subscriptions');
     return rows.map(r => ({
@@ -80,7 +71,7 @@ exports.getAllSubscriptions = async () => {
     }));
 };
 
-
+// neue Subscription hinzufügen (verhindert Duplikate)
 exports.addSubscription = async (uid, subscription) => {
     await pool.query(`
         INSERT INTO subscriptions (uid, subscription)
@@ -88,6 +79,7 @@ exports.addSubscription = async (uid, subscription) => {
     `, [uid, subscription]);
 };
 
+// optional: Subscription löschen (z.B. wenn Push fehlschlägt)
 exports.removeSubscription = async (uid, subscription) => {
     await pool.query(`
         DELETE
@@ -97,14 +89,6 @@ exports.removeSubscription = async (uid, subscription) => {
     `, [uid, subscription]);
 };
 
-exports.removeAllSubscriptions = async (uid) => {
-    await pool.query('DELETE FROM subscriptions WHERE uid = $1', [uid]);
-};
-
-exports.replaceSubscription = async (uid, newSub) => {
-    await this.removeAllSubscriptions(uid);
-    await this.addSubscription(uid, newSub);
-};
 
 exports.delete = uid => pool.query('DELETE FROM tokens WHERE uid=$1', [uid]);
 

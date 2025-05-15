@@ -3,7 +3,6 @@ const cache = require('./cache');
 const {store} = require('./auth');
 const axios = require('axios');
 const qs = require('querystring');
-const tokenStore = require("./tokenStore");
 const router = express.Router();
 const subscriptions = [];
 
@@ -99,13 +98,18 @@ router.post('/subscribe', async (req, res) => {
         const uid = req.headers['x-user-id'];
         if (!uid) return res.status(400).json({error: 'missing_uid'});
 
-        await store.replaceSubscription(uid, req.body);
+        const entry = {
+            uid,
+            subscription: req.body
+        };
 
+        await store.addSubscription(uid, req.body);
         res.status(201).json({success: true});
     } catch (err) {
         console.error('Subscription Error:', err.message);
         res.status(500).json({error: err.message});
     }
 });
+
 
 module.exports = {router, subscriptions};
