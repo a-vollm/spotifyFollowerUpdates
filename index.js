@@ -63,36 +63,37 @@ cron.schedule('*/1 * * * *', async () => {
 
     console.log(`📀 Playlist "${data.name}" hat ${currentSet.size} Tracks`);
 
-    // Vergleiche mit einem Benutzer (z. B. erstem)
-    const firstUid = Object.keys(allTokens)[0];
-    const oldSet = await tokenStore.getPlaylistCache(playlistId, firstUid);
-    const {added, removed} = compareSets(oldSet, currentSet);
+    let shouldNotify = false;
+    for (const uid of Object.keys(allTokens)) {
+        const oldSet = await tokenStore.getPlaylistCache(playlistId, uid);
+        const {added, removed} = compareSets(oldSet, currentSet);
+        if (added.length > 0 || removed.length > 0) {
+            shouldNotify = true;
+            break;
+        }
+    }
 
-    if (added.length === 0 && removed.length === 0) {
+    if (!shouldNotify) {
         console.log('⏩ Keine Änderungen – überspringe Benachrichtigung.');
         return;
     }
 
     let addedByName = null;
-    if (added.length > 0) {
-        const addedTrack = data.tracks.find(t => added.includes(t.track.id));
-        addedByName = addedTrack?.added_by?.display_name || null;
+    const sampleTrack = data.tracks.find(t => t && currentSet.has(t.track.id));
+    if (sampleTrack?.added_by?.display_name) {
+        addedByName = sampleTrack.added_by.display_name;
     }
 
     const parts = [];
-    if (added.length > 0) {
-        const addedText = added.length === 1
-            ? `${addedByName} hat 1 neuen Track hinzugefügt`
-            : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`;
-        parts.push(addedText);
-    }
+    const firstUid = Object.keys(allTokens)[0];
+    const firstOldSet = await tokenStore.getPlaylistCache(playlistId, firstUid);
+    const {added, removed} = compareSets(firstOldSet, currentSet);
 
-    if (removed.length > 0) {
-        const removedText = removed.length === 1
-            ? `1 Track wurde entfernt`
-            : `${removed.length} Tracks wurden entfernt`;
-        parts.push(removedText);
-    }
+    added.length > 0
+        ? parts.push(added.length === 1 ? `${addedByName} hat 1 neuen Track hinzugefügt` : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`)
+        : undefined;
+
+    removed.length > 0 ? parts.push(removed.length === 1 ? `1 Track wurde entfernt` : `${removed.length} Tracks wurden entfernt`) : undefined
 
     const fullText = parts.join(' • ');
     const payload = JSON.stringify({
@@ -111,7 +112,7 @@ cron.schedule('*/1 * * * *', async () => {
 
     console.log(`📤 Sende Benachrichtigung an alle betroffenen User: "${fullText}"`);
 
-    const sent = new Set();               // endpoint-Set
+    const sent = new Set(); // um Duplikate zu vermeiden
     for (const {uid, subscription} of activeSubs) {
         const id = subscription.endpoint;
         if (sent.has(id)) continue;
@@ -129,6 +130,7 @@ cron.schedule('*/1 * * * *', async () => {
         console.log(`✅ Cache für ${uid} aktualisiert`);
     }
 });
+
 
 cron.schedule('*/30 * * * *', async () => {
     const allTokens = await tokenStore.all();
