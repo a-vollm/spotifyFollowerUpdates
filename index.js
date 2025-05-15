@@ -111,11 +111,15 @@ cron.schedule('*/1 * * * *', async () => {
 
     console.log(`📤 Sende Benachrichtigung an alle betroffenen User: "${fullText}"`);
 
+    const sent = new Set();               // endpoint-Set
     for (const {uid, subscription} of activeSubs) {
+        const id = subscription.endpoint;
+        if (sent.has(id)) continue;
         try {
             await webpush.sendNotification(subscription, payload);
+            sent.add(id);
         } catch (e) {
-            console.warn(`⚠️ Push fehlgeschlagen für UID ${uid}, lösche Subscription...`);
+            console.warn(`⚠️ Push fehlgeschlagen – lösche Abo …`);
             await tokenStore.removeSubscription(uid, subscription);
         }
     }
