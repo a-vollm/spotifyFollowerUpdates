@@ -52,6 +52,8 @@ function compareSets(oldSet, newSet) {
 }
 
 cron.schedule('*/1 * * * *', async () => {
+    const activeSubs = await tokenStore.getAllSubscriptions();
+    console.log('ACTIVE SUBSCRIPTIONS', activeSubs);
     console.log('🎧 Starte Playlist-Check...');
     const playlistId = '4QTlILYEMucSKLHptGxjAq';
     const allTokens = await tokenStore.all();
@@ -65,7 +67,7 @@ cron.schedule('*/1 * * * *', async () => {
 
     const pendingCacheUpdates = [];
 
-    for (const [uid, token] of Object.entries(allTokens)) {
+    for (const uid of Object.entries(allTokens)) {
         try {
             console.log(`\n--- Prüfe UID ${uid} ---`);
 
@@ -118,9 +120,6 @@ cron.schedule('*/1 * * * *', async () => {
             });
 
             console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
-
-            const activeSubs = await tokenStore.getAllSubscriptions();
-            console.log('📦 Aktuelle Subscriptions:', JSON.stringify(activeSubs, null, 2));
             for (const sub of activeSubs) {
                 console.log(sub.subscription);
                 await webpush.sendNotification(sub.subscription, payload);
