@@ -147,7 +147,8 @@ cron.schedule('*/1 * * * *', async () => {
 
 cron.schedule('*/30 * * * *', async () => {
     const allTokens = await tokenStore.all();
-
+    const activeSubs = await tokenStore.getAllSubscriptions();
+    console.log('ACTIVE SUBSCRIPTIONS', activeSubs);
     for (const [uid, token] of Object.entries(allTokens)) {
         try {
             const oldSet = await tokenStore.getReleaseCache(uid);
