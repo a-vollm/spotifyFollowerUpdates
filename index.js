@@ -63,74 +63,73 @@ cron.schedule('*/1 * * * *', async () => {
 
     console.log(`📀 Playlist "${data.name}" hat ${currentSet.size} Tracks`);
 
-    let shouldNotify = false;
-    for (const uid of Object.keys(allTokens)) {
+    // Für jeden Nutzer individuell prüfen
+    for (const [uid, token] of Object.entries(allTokens)) {
         const oldSet = await tokenStore.getPlaylistCache(playlistId, uid);
         const {added, removed} = compareSets(oldSet, currentSet);
-        if (added.length > 0 || removed.length > 0) {
-            shouldNotify = true;
-            break;
+
+        if (added.length === 0 && removed.length === 0) {
+            console.log(`⏩ Keine Änderungen für ${uid} – überspringe.`);
+            continue;
         }
-    }
 
-    if (!shouldNotify) {
-        console.log('⏩ Keine Änderungen – überspringe Benachrichtigung.');
-        return;
-    }
-
-    let addedByName = null;
-    const sampleTrack = data.tracks.find(t => t && currentSet.has(t.track.id));
-    if (sampleTrack?.added_by?.display_name) {
-        addedByName = sampleTrack.added_by.display_name;
-    }
-
-    const parts = [];
-    const firstUid = Object.keys(allTokens)[0];
-    const firstOldSet = await tokenStore.getPlaylistCache(playlistId, firstUid);
-    const {added, removed} = compareSets(firstOldSet, currentSet);
-
-    added.length > 0
-        ? parts.push(added.length === 1 ? `${addedByName} hat 1 neuen Track hinzugefügt` : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`)
-        : undefined;
-
-    removed.length > 0 ? parts.push(removed.length === 1 ? `1 Track wurde entfernt` : `${removed.length} Tracks wurden entfernt`) : undefined
-
-    const fullText = parts.join(' • ');
-    const payload = JSON.stringify({
-        notification: {
-            title: `${data.name}`,
-            body: fullText,
-            icon: '/assets/icons/icon-192x192.png',
-            badge: '/assets/icons/badge.png',
-            tag: `playlist-tracking`,
-            renotify: true,
-            silent: false,
-            requireInteraction: true,
-            data: {origin: 'playlist-monitor'}
+        // Nachricht für diesen Nutzer generieren
+        let addedByName = null;
+        const sampleTrack = data.tracks.find(t => t && currentSet.has(t.track.id));
+        if (sampleTrack?.added_by?.display_name) {
+            addedByName = sampleTrack.added_by.display_name;
         }
-    });
 
-    console.log(`📤 Sende Benachrichtigung an alle betroffenen User: "${fullText}"`);
+        const parts = [];
+        added.length > 0
+            ? parts.push(added.length === 1
+                ? `${addedByName} hat 1 neuen Track hinzugefügt`
+                : `${added.length} neue Tracks wurden von ${addedByName} hinzugefügt`)
+            : null;
 
-    const sent = new Set(); // um Duplikate zu vermeiden
-    for (const {uid, subscription} of activeSubs) {
-        const id = subscription.endpoint;
-        if (sent.has(id)) continue;
-        try {
-            await webpush.sendNotification(subscription, payload);
-            sent.add(id);
-        } catch (e) {
-            console.warn(`⚠️ Push fehlgeschlagen – lösche Abo …`);
-            await tokenStore.removeSubscription(uid, subscription);
+        removed.length > 0
+            ? parts.push(removed.length === 1
+                ? `1 Track wurde entfernt`
+                : `${removed.length} Tracks wurden entfernt`)
+            : null;
+
+        const fullText = parts.join(' • ');
+        const payload = JSON.stringify({
+            notification: {
+                title: `${data.name}`,
+                body: fullText,
+                icon: '/assets/icons/icon-192x192.png',
+                badge: '/assets/icons/badge.png',
+                tag: `playlist-tracking-${uid}`, // Eindeutiges Tag pro Nutzer
+                renotify: true,
+                silent: false,
+                requireInteraction: true,
+                data: {origin: 'playlist-monitor'}
+            }
+        });
+
+        console.log(`📤 Sende Benachrichtigung an ${uid}: "${fullText}"`);
+
+        // Nur Subscriptions dieses Nutzers berücksichtigen
+        const userSubs = activeSubs.filter(sub => sub.uid === uid);
+        const sent = new Set();
+        for (const {subscription} of userSubs) {
+            const id = subscription.endpoint;
+            if (sent.has(id)) continue;
+            try {
+                await webpush.sendNotification(subscription, payload);
+                sent.add(id);
+            } catch (e) {
+                console.warn(`⚠️ Push fehlgeschlagen für ${uid} – lösche Abo …`);
+                await tokenStore.removeSubscription(uid, subscription);
+            }
         }
-    }
 
-    for (const uid of Object.keys(allTokens)) {
+        // Cache für diesen Nutzer aktualisieren
         await tokenStore.setPlaylistCache(playlistId, uid, [...currentSet]);
         console.log(`✅ Cache für ${uid} aktualisiert`);
     }
 });
-
 
 cron.schedule('*/30 * * * *', async () => {
     const allTokens = await tokenStore.all();
