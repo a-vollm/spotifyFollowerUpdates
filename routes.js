@@ -56,7 +56,8 @@ const ensureAuth = async (req, res, next) => {
 };
 
 router.get('/cache-status', ensureAuth, async (req, res) => {
-    const st = cache.getCacheStatus(req.uid);
+    const userCache = cache.getCache(req.uid);
+    const st = userCache.status;
 
     if (!st.loading && (st.totalArtists === 0 || st.doneArtists < st.totalArtists)) {
         try {
@@ -69,7 +70,7 @@ router.get('/cache-status', ensureAuth, async (req, res) => {
         }
     }
 
-    res.json(cache.getCacheStatus(req.uid));
+    res.json(userCache.status);
 });
 
 

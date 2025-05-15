@@ -135,6 +135,7 @@ const getReleases = (uid, y) => getCache(uid).releases[y] || [];
 module.exports = {
     rebuild,
     getCacheStatus,
+    getCache,
     getLatest,
     getReleases,
     getPlaylistData
