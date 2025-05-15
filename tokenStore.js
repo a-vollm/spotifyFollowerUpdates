@@ -36,6 +36,15 @@ exports.getPlaylistCache = async (playlistId) => {
     return new Set(rows[0]?.track_ids ?? []);
 };
 
+exports.setPlaylistCache = async (playlistId, trackIds) => {
+    await pool.query(`
+        INSERT INTO playlist_cache (playlist_id, track_ids)
+        VALUES ($1, $2) ON CONFLICT (playlist_id) DO
+        UPDATE
+            SET track_ids = EXCLUDED.track_ids
+    `, [playlistId, trackIds]);
+};
+
 exports.getReleaseCache = async (uid) => {
     const {rows} = await pool.query(
         'SELECT id FROM release_cache WHERE uid=$1', [uid]
