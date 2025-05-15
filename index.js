@@ -5,7 +5,6 @@ const http = require('http');
 const cron = require('node-cron');
 const webpush = require('web-push');
 const app = express();
-const router = express.Router();
 const server = http.createServer(app);
 const {initAuth} = require('./auth');
 const {router: apiRouter} = require('./routes');
@@ -51,35 +50,6 @@ function compareSets(oldSet, newSet) {
     const removed = [...oldSet].filter(x => !newSet.has(x));
     return {added, removed};
 }
-
-router.get('/debug-cache', async (req, res) => {
-    try {
-        const playlistId = req.query.playlistId || '4QTlILYEMucSKLHptGxjAq'; // Playlist-ID aus Query oder Standardwert
-        const uid = req.query.uid; // UID als Query-Parameter
-
-        if (!uid) {
-            return res.status(400).json({error: "UID fehlt (Gib ?uid=DEINE_UID an)"});
-        }
-
-        const allTokens = await tokenStore.all();
-        const sampleToken = allTokens[uid];
-        if (!sampleToken) {
-            return res.status(404).json({error: "UID nicht gefunden"});
-        }
-
-        const dbCache = await tokenStore.getPlaylistCache(playlistId, uid);
-        const data = await cache.getPlaylistData(playlistId, sampleToken.access);
-        const currentTracks = getTrackIds(data);
-
-        res.json({
-            dbCache: [...dbCache],
-            currentTracks: [...currentTracks],
-            mismatch: dbCache.size !== currentTracks.size
-        });
-    } catch (err) {
-        res.status(500).json({error: err.message});
-    }
-});
 
 cron.schedule('*/1 * * * *', async () => {
     if (isJobRunning) {
