@@ -67,7 +67,7 @@ cron.schedule('*/1 * * * *', async () => {
 
     const pendingCacheUpdates = [];
 
-    for (const uid of Object.entries(allTokens)) {
+    for (const [uid, token] of Object.entries(allTokens)) {
         try {
             console.log(`\n--- Prüfe UID ${uid} ---`);
 
@@ -120,9 +120,15 @@ cron.schedule('*/1 * * * *', async () => {
             });
 
             console.log(`📤 Sende Benachrichtigung: "${fullText}"`);
-            for (const sub of activeSubs) {
-                await webpush.sendNotification(sub.subscription, payload);
+            for (const sub of activeSubs.filter(s => s.uid === uid)) {
+                try {
+                    await webpush.sendNotification(sub.subscription, payload);
+                } catch (e) {
+                    console.warn(`⚠️ Push fehlgeschlagen für UID ${sub.uid}, lösche Subscription...`);
+                    await tokenStore.removeSubscription(sub.uid, sub.subscription);
+                }
             }
+
 
             pendingCacheUpdates.push({uid, cacheKey: `${playlistId}_${uid}`, newSet: [...currentSet]});
             console.log('🕒 Cache-Aktualisierung vorgemerkt.');
@@ -181,9 +187,15 @@ cron.schedule('*/30 * * * *', async () => {
                 }
             });
 
-            for (const sub of activeSubs) {
-                await webpush.sendNotification(sub.subscription, payload);
+            for (const sub of activeSubs.filter(s => s.uid === uid)) {
+                try {
+                    await webpush.sendNotification(sub.subscription, payload);
+                } catch (e) {
+                    console.warn(`⚠️ Push fehlgeschlagen für UID ${sub.uid}, lösche Subscription...`);
+                    await tokenStore.removeSubscription(sub.uid, sub.subscription);
+                }
             }
+
         } catch (e) {
             console.error(`❌ Fehler beim Release-Check für UID ${uid}:`, e.message);
         }
