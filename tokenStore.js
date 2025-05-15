@@ -15,6 +15,19 @@ exports.get = async uid => {
     return rows[0] ?? null;
 };
 
+exports.set = async (uid, t) => {
+    const exp = Math.floor(t.exp); // PostgreSQL erwartet BIGINT
+    await pool.query(`
+        INSERT INTO tokens (uid, access, refresh, exp)
+        VALUES ($1, $2, $3, $4) ON CONFLICT (uid) DO
+        UPDATE
+            SET access = EXCLUDED.access,
+            refresh = EXCLUDED.refresh,
+            exp = EXCLUDED.exp,
+            updated_at = CURRENT_TIMESTAMP
+    `, [uid, t.access, t.refresh, exp]);
+};
+
 exports.setPlaylistCache = async (playlistId, uid, trackIds) => {
     await pool.query(`
         INSERT INTO playlist_cache (playlist_id, uid, track_ids)
