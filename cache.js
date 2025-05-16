@@ -20,6 +20,7 @@ function getCache(uid) {
 async function rebuild(uid, token) {
     const cache = getCache(uid);
 
+    if (cache.status.loading) return;
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
     const io = require('./socket').get?.();       // kann undefined sein
@@ -48,6 +49,7 @@ async function rebuild(uid, token) {
         const allAlbums = [];
 
         for (let i = 0; i < allArtists.length; i++) {
+            const artist = allArtists[i];
             let attempts = 0;
             let success = false;
 
