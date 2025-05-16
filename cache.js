@@ -20,9 +20,6 @@ function getCache(uid) {
 
 async function rebuild(uid, token) {
     const cache = getCache(uid);
-    while (cache.status.loading) {           // warten bis vorheriger Job fertig
-        await new Promise(r => setTimeout(r, 500));
-    }
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
     const io = require('./socket').get?.();       // kann undefined sein
