@@ -48,7 +48,7 @@ async function rebuild(uid, token) {
         /* ---------- Releases sequential holen (1 Req / 300 ms) ---------- */
         const allAlbums = [];
 
-        for (const artist of allArtists) {
+        for (let i = 0; i < allArtists.length; i++) {
             let attempts = 0;
             let success = false;
 
