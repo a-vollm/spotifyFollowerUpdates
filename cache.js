@@ -19,6 +19,8 @@ function getCache(uid) {
 
 async function rebuild(uid, token) {
     const cache = getCache(uid);
+
+    if (cache.status.loading) return;
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
     const io = require('./socket').get?.();       // kann undefined sein
@@ -73,7 +75,8 @@ async function rebuild(uid, token) {
                 attempts++;
             }
 
-            cache.status.doneArtists++;
+            cache.status.doneArtists = i + 1;
+
             io?.to(uid).emit('cache-progress', {
                 total: cache.status.totalArtists,
                 done: cache.status.doneArtists
