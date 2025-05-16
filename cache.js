@@ -20,9 +20,12 @@ function getCache(uid) {
 
 async function rebuild(uid, token) {
     const cache = getCache(uid);
+    while (cache.status.loading) {           // warten bis vorheriger Job fertig
+        await new Promise(r => setTimeout(r, 500));
+    }
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
-    const io = require('./socket').get?.();       // kann undefined sein
+    const getIo = () => require('./socket').get();
 
     try {
         /* ---------- Gefolgte Artists holen ---------- */
@@ -77,7 +80,7 @@ async function rebuild(uid, token) {
 
             cache.status.doneArtists = i + 1;
 
-            io?.to(uid).emit('cache-progress', {
+            getIo()?.to(uid).emit('cache-progress', {
                 total: cache.status.totalArtists,
                 done: cache.status.doneArtists
             });
