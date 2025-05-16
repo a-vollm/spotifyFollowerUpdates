@@ -1,5 +1,4 @@
 const axios = require('axios');
-
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const AXIOS_TIMEOUT = 25_000;
 
@@ -22,6 +21,8 @@ async function rebuild(uid, token) {
     const cache = getCache(uid);
     cache.status = {loading: true, totalArtists: 0, doneArtists: 0};
 
+    const io = require('./socket').get?.();       // kann undefined sein
+
     try {
         /* ---------- Gefolgte Artists holen ---------- */
         const allArtists = [];
@@ -35,35 +36,57 @@ async function rebuild(uid, token) {
 
         cache.status.totalArtists = allArtists.length;
 
-        /* ---------- EARLY-EXIT: Nutzer folgt niemandem ---------- */
         if (allArtists.length === 0) {
             cache.latest = [];
             cache.releases = {};
             cache.status.loading = false;
-            return;                                // sofort abbrechen
+            return;
         }
 
-        /* ---------- Releases holen ---------- */
+        /* ---------- Releases sequential holen (1 Req / 300 ms) ---------- */
         const allAlbums = [];
+
         for (const artist of allArtists) {
-            const r = await api.get(
-                `${SPOTIFY_API}/artists/${artist.id}/albums`,
-                {
-                    headers: {Authorization: `Bearer ${token}`},
-                    params: {include_groups: 'album,single', limit: 50}
+            let attempts = 0;
+            let success = false;
+
+            while (!success && attempts < 2) {          // max. 1 Retry
+                try {
+                    const r = await api.get(
+                        `${SPOTIFY_API}/artists/${artist.id}/albums`,
+                        {
+                            headers: {Authorization: `Bearer ${token}`},
+                            params: {include_groups: 'album,single', limit: 50}
+                        }
+                    );
+                    allAlbums.push(...r.data.items);
+                    success = true;
+                } catch (e) {
+                    if (e.response?.status === 429) {
+                        const retry = Number(e.response.headers['retry-after'] || 1);
+                        await new Promise(r => setTimeout(r, (retry + 1) * 1000));
+                    } else {
+                        console.warn(`⚠️  Artist ${artist.id}:`, e.message);
+                        break;
+                    }
                 }
-            );
-            allAlbums.push(...r.data.items);
+                attempts++;
+            }
+
             cache.status.doneArtists++;
-            await new Promise(res => setTimeout(res, 100));      // nur für UI-Progress
+            io?.to(uid).emit('cache-progress', {
+                total: cache.status.totalArtists,
+                done: cache.status.doneArtists
+            });
+
+            await new Promise(r => setTimeout(r, 300));   // 1 Request alle 300 ms
         }
 
-        /* ---------- EARLY-EXIT: keine Releases gefunden ---------- */
         if (allAlbums.length === 0) {
             cache.latest = [];
             cache.releases = {};
             cache.status.loading = false;
-            return;                                // sofort abbrechen
+            return;
         }
 
         /* ---------- Gruppieren nach Jahr/Monat ---------- */
@@ -95,6 +118,7 @@ async function rebuild(uid, token) {
         cache.status.loading = false;
     }
 }
+
 
 async function getPlaylistData(playlistId, token) {
     const urlBase = `${SPOTIFY_API}/playlists/${playlistId}`;
